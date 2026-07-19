@@ -5,6 +5,7 @@ import { Signup } from './pages/Signup';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
+import { Budgets } from './pages/Budgets';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/transactions" element={<Transactions />} />
+          <Route path="/budgets" element={<Budgets />} />
         </Route>
       </Routes>
     </Router>

@@ -218,8 +218,8 @@ export function Budgets() {
               <CardTitle>Budget vs Actual Trends</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="w-full">
+                <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
@@ -238,37 +238,37 @@ export function Budgets() {
         {/* Right Column: AI Coach & Analytics */}
         <div className="space-y-6">
           {/* AI Coach Widget */}
-          <div className="bg-gradient-to-b from-indigo-900 to-slate-900 rounded-2xl p-6 shadow-xl relative overflow-hidden text-white border border-indigo-800">
+          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 shadow-sm relative overflow-hidden text-slate-800 border border-indigo-100">
             <div className="absolute -right-4 -top-4 opacity-10">
-              <Bot className="w-32 h-32" />
+              <Bot className="w-32 h-32 text-indigo-600" />
             </div>
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                  <Bot className="w-5 h-5 text-indigo-300" />
+                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center border border-indigo-200">
+                  <Bot className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-indigo-100">AI Budget Coach</h3>
-                  <p className="text-xs text-indigo-300">Live Insights</p>
+                  <h3 className="font-bold text-lg text-indigo-900">AI Budget Coach</h3>
+                  <p className="text-xs text-indigo-600 font-medium">Live Insights</p>
                 </div>
               </div>
               
               <div className="space-y-3">
-                <div className="bg-white/10 backdrop-blur-sm p-3 rounded-lg border border-white/5">
+                <div className="bg-white p-3 rounded-lg border border-indigo-50 shadow-sm">
                   <p className="text-sm flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                     <span>Your <strong>Shopping Budget</strong> has exceeded by ₹1,200. Avoid non-essential purchases this week.</span>
                   </p>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm p-3 rounded-lg border border-white/5">
+                <div className="bg-white p-3 rounded-lg border border-indigo-50 shadow-sm">
                   <p className="text-sm flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                     <span>You have kept Food spending 15% lower than average!</span>
                   </p>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm p-3 rounded-lg border border-white/5">
+                <div className="bg-white p-3 rounded-lg border border-indigo-50 shadow-sm">
                   <p className="text-sm flex items-start gap-2">
-                    <PieChartIcon className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                    <PieChartIcon className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                     <span>Consider re-allocating ₹2,000 from Transport to Shopping to balance out your overspending.</span>
                   </p>
                 </div>

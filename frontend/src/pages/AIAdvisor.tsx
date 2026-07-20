@@ -176,7 +176,7 @@ export function AIAdvisor() {
       <div className="w-full lg:w-2/3 flex flex-col gap-4 overflow-y-auto pr-2 scrollbar-hide">
         
         {/* Module Navigation Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide bg-white p-2 rounded-xl shadow-sm border border-slate-100">
+        <div className="shrink-0 flex gap-2 overflow-x-auto pb-2 scrollbar-hide bg-white p-2 rounded-xl shadow-sm border border-slate-100">
           {[
             { id: 'Home', icon: Sparkles, label: 'AI Home' },
             { id: 'Spending', icon: PieChartIcon, label: 'Spending' },

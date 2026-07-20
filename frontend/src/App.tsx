@@ -8,6 +8,8 @@ import { Transactions } from './pages/Transactions';
 import { Budgets } from './pages/Budgets';
 import { Goals } from './pages/Goals';
 import { RecurringPayments } from './pages/RecurringPayments';
+import { Reports } from './pages/Reports';
+import { AIAdvisor } from './pages/AIAdvisor';
 
 // Main Application Router
 function App() {
@@ -25,6 +27,8 @@ function App() {
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/recurring" element={<RecurringPayments />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/ai-advisor" element={<AIAdvisor />} />
         </Route>
       </Routes>
     </Router>

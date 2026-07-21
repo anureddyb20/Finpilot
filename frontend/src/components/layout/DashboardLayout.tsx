@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, Link } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Bell, Search } from 'lucide-react';
 
@@ -18,10 +18,10 @@ export function DashboardLayout() {
           </div>
           
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors">
+            <Link to="/notifications" className="relative p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
+            </Link>
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-accent p-[2px]">
               <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-white">
                 <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="Profile" className="w-full h-full object-cover" />

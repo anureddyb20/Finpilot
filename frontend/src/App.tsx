@@ -10,6 +10,8 @@ import { Goals } from './pages/Goals';
 import { RecurringPayments } from './pages/RecurringPayments';
 import { Reports } from './pages/Reports';
 import { AIAdvisor } from './pages/AIAdvisor';
+import { Settings } from './pages/Settings';
+import { Notifications } from './pages/Notifications';
 
 // Main Application Router
 function App() {
@@ -29,6 +31,8 @@ function App() {
           <Route path="/recurring" element={<RecurringPayments />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/ai-advisor" element={<AIAdvisor />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/notifications" element={<Notifications />} />
         </Route>
       </Routes>
     </Router>

@@ -3,11 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
   ArrowUpRight, Plus, Bot, Edit3, Trash2, X, Target, 
-  CalendarDays, CheckCircle2, TrendingUp, Wallet, Car, Home, 
-  Briefcase, HeartPulse, GraduationCap, Plane, Laptop, Smartphone,
+  CalendarDays, TrendingUp, Wallet, Home, 
+  Plane, Laptop,
   Trophy, Star, Award
 } from 'lucide-react';
-import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const formatInr = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {

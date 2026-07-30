@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
-  ArrowUpRight, ArrowDownRight, Plus, AlertTriangle, 
+  ArrowUpRight, Plus, AlertTriangle, 
   Bot, Edit3, Trash2, X, Target, CalendarDays, PieChart as PieChartIcon, CheckCircle2, TrendingDown,
-  ShoppingBag, Utensils, Home, Zap, HeartPulse, GraduationCap, Car, Briefcase
+  ShoppingBag, Utensils, Home, Zap, HeartPulse, Car
 } from 'lucide-react';
-import { BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
 const formatInr = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {

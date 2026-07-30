@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
-  ArrowUpRight, ArrowDownRight, Wallet, PiggyBank, CreditCard, TrendingUp,
+  ArrowUpRight, Wallet, PiggyBank, CreditCard, TrendingUp,
   Search, Bell, Plus, Minus, Send, Target, Sparkles, Brain, Clock, 
-  ShoppingCart, Utensils, Home, Zap, Car, Briefcase, Activity, CheckCircle2,
-  AlertTriangle, Info, ChevronRight, Laptop, Plane, FileText, Smartphone,
-  Menu, X
+  ShoppingCart, Utensils, Zap, Car, Briefcase, Activity, CheckCircle2,
+  AlertTriangle, Laptop, Plane, FileText
 } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell } from 'recharts';
 

@@ -13,13 +13,10 @@ import {
   Bot,
   ShieldAlert,
   Trophy,
-  MoreVertical,
   Check,
   Archive,
   Trash2,
   Calendar,
-  XCircle,
-  TrendingUp,
   Clock
 } from 'lucide-react';
 import { cn } from '../components/ui/Button';

@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
-  Bot, Send, Mic, Sparkles, TrendingUp, TrendingDown, Shield, 
+  Bot, Send, Mic, Sparkles, TrendingUp, TrendingDown, 
   Target, Target as TargetIcon, Zap, Activity, AlertTriangle, AlertCircle, CheckCircle2,
-  PieChart as PieChartIcon, ArrowRight, MessageSquare, Plus, RefreshCw, Smartphone, CreditCard, HeartPulse
+  PieChart as PieChartIcon, Smartphone, CreditCard, HeartPulse
 } from 'lucide-react';
 import { 
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area 
+  XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area 
 } from 'recharts';
 
 const formatInr = (amount: number) => {

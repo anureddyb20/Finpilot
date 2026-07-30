@@ -2,12 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
-  ArrowUpRight, ArrowDownRight, Search, Filter, Plus, FileUp, FileDown, 
-  Trash2, MoreHorizontal, FileText, CheckCircle2, Clock, XCircle, RefreshCw, 
-  Utensils, ShoppingCart, Zap, Car, Briefcase, ChevronDown, Bot, Tag, 
-  X, Edit3, Image as ImageIcon, AlertTriangle, Monitor, RotateCcw
+  ArrowUpRight, Search, Filter, Plus, FileDown, 
+  Trash2, MoreHorizontal, FileText, CheckCircle2, Clock, RefreshCw, 
+  Utensils, ShoppingCart, Zap, Car, Briefcase, Bot, Tag, 
+  X, Edit3, Image as ImageIcon, Monitor, RotateCcw
 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, Tooltip, ResponsiveContainer } from 'recharts';
 
 // Format currency in INR
 const formatInr = (amount: number) => {

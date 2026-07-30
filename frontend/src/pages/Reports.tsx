@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
-  ArrowUpRight, ArrowDownRight, Download, Printer, Share2, 
-  TrendingUp, TrendingDown, CheckCircle2, AlertTriangle, Zap,
-  Target, Target as TargetIcon, Clock, CreditCard, Wallet, Smartphone, Shield, AlertCircle, Bot
+  ArrowUpRight, Download, Printer, Share2, 
+  TrendingUp, TrendingDown, AlertTriangle, Zap,
+  Target as TargetIcon, Clock, Wallet, Bot
 } from 'lucide-react';
 import { 
-  LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
+  LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, 
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend 
 } from 'recharts';
 
@@ -55,14 +55,6 @@ const categoryAnalysis = [
   { category: 'Shopping', budget: 6000, spent: 8500, remaining: -2500, util: 141, status: 'Exceeded' },
   { category: 'Travel', budget: 5000, spent: 4200, remaining: 800, util: 84, status: 'Safe' },
   { category: 'Bills', budget: 4000, spent: 3450, remaining: 550, util: 86, status: 'Safe' },
-];
-
-const topCategories = [
-  { category: 'Rent', amount: 18000, percent: 36, trend: 'stable' },
-  { category: 'Food', amount: 12500, percent: 25, trend: 'down' },
-  { category: 'Shopping', amount: 8500, percent: 17, trend: 'up' },
-  { category: 'Travel', amount: 4200, percent: 8, trend: 'stable' },
-  { category: 'Bills', amount: 3450, percent: 7, trend: 'up' },
 ];
 
 const paymentMethods = [

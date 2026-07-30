@@ -3,11 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
   ArrowUpRight, ArrowDownRight, Plus, Bot, Edit3, Trash2, X, CalendarDays, 
-  CreditCard, Tv, Zap, Wifi, Droplet, Smartphone, Shield, Car, Home, 
-  Briefcase, Activity, CheckCircle2, Clock, AlertTriangle, RefreshCw, BarChart2, PieChart as PieChartIcon,
-  Calendar, History, Search, Bell, Sparkles, FileText, CheckCircle, ChevronRight, ChevronLeft, Building2, Landmark, Plane, Coffee, Dumbbell, GraduationCap, Server
+  CreditCard, Tv, Zap, Wifi, Smartphone, Shield, Car, Home, 
+  Activity, CheckCircle2, Clock, AlertTriangle, RefreshCw, BarChart2, PieChart as PieChartIcon,
+  Calendar, Sparkles, CheckCircle, ChevronRight, ChevronLeft, Building2, Dumbbell, Server
 } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const formatInr = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {

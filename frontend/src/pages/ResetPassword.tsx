@@ -1,47 +1,84 @@
-import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Zap, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Zap, Lock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 
-export function Login() {
-  const [email, setEmail] = useState('');
+export function ResetPassword() {
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  useEffect(() => {
+    // Check if there is an active session or a hash in the URL to allow reset
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session && !window.location.hash) {
+        // If there's no session and no hash from the email link, redirect to login
+        navigate('/login');
+      }
+    });
+  }, [navigate]);
+
+  const validatePassword = (pass: string) => {
+    if (pass.length < 8) return "Password must be at least 8 characters long.";
+    if (!/[A-Z]/.test(pass)) return "Password must contain an uppercase letter.";
+    if (!/[a-z]/.test(pass)) return "Password must contain a lowercase letter.";
+    if (!/[0-9]/.test(pass)) return "Password must contain a number.";
+    return null;
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (password !== confirmPassword) {
+      return setError("Passwords do not match.");
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return setError(passwordError);
+    }
+
     setLoading(true);
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const { error } = await supabase.auth.updateUser({
+        password: password
       });
 
-      if (signInError) throw signInError;
+      if (error) throw error;
 
-      // Remember me logic: 
-      // Supabase automatically persists session in localStorage by default.
-      // If remember me is false, we might want to change the persistence strategy to session, 
-      // but by default keeping it simple to just use the default persistence.
-      
-      const from = location.state?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 3000);
     } catch (err: any) {
-      setError(err.message || 'Invalid login credentials.');
+      setError(err.message || 'An error occurred.');
     } finally {
       setLoading(false);
     }
   };
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+            <CheckCircle2 className="h-6 w-6 text-green-600" />
+          </div>
+          <h2 className="text-3xl font-bold text-slate-900 mb-2">Password Updated</h2>
+          <p className="text-slate-600 mb-6">
+            Your password has been successfully reset. Redirecting to your dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -53,13 +90,10 @@ export function Login() {
           <span className="text-3xl font-bold text-slate-900 tracking-tight">FinPilot</span>
         </Link>
         <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-slate-900">
-          Sign in to your account
+          Set new password
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
-          Or{' '}
-          <Link to="/signup" className="font-medium text-primary hover:text-blue-500 transition-colors">
-            create a new account
-          </Link>
+          Please enter your new password below.
         </p>
       </div>
 
@@ -76,26 +110,9 @@ export function Login() {
             </div>
           )}
 
-          <form className="space-y-6" onSubmit={handleLogin}>
+          <form className="space-y-6" onSubmit={handleUpdatePassword}>
             <div>
-              <label className="block text-sm font-medium text-slate-700">Email address</label>
-              <div className="mt-2 relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm transition-all"
-                  placeholder="you@example.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Password</label>
+              <label className="block text-sm font-medium text-slate-700">New Password</label>
               <div className="mt-2 relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-slate-400" />
@@ -111,30 +128,25 @@ export function Login() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Confirm New Password</label>
+              <div className="mt-2 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-slate-400" />
+                </div>
                 <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm transition-all"
+                  placeholder="••••••••"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-900">
-                  Remember me
-                </label>
-              </div>
-
-              <div className="text-sm">
-                <Link to="/forgot-password" className="font-medium text-primary hover:text-blue-500">
-                  Forgot your password?
-                </Link>
               </div>
             </div>
 
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? 'Updating...' : 'Update password'}
             </Button>
           </form>
         </div>

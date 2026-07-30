@@ -12,6 +12,7 @@ import {
   Zap
 } from 'lucide-react';
 import { cn } from '../ui/Button';
+import { supabase } from '../../lib/supabase';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -25,6 +26,12 @@ const navigation = [
 
 export function Sidebar() {
   const navigate = useNavigate();
+  
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
+
   return (
     <div className="flex flex-col w-64 bg-white border-r border-slate-100 h-screen fixed left-0 top-0">
       <div className="flex items-center gap-2 px-6 h-16 border-b border-slate-100">
@@ -68,7 +75,7 @@ export function Sidebar() {
           Settings
         </NavLink>
         <button 
-          onClick={() => navigate('/login')}
+          onClick={handleSignOut}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors w-full"
         >
           <LogOut className="w-5 h-5" />

@@ -1,6 +1,6 @@
 import { Outlet, Link } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, User } from 'lucide-react';
 
 export function DashboardLayout() {
   return (
@@ -22,11 +22,11 @@ export function DashboardLayout() {
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </Link>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-accent p-[2px]">
-              <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-white">
-                <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="Profile" className="w-full h-full object-cover" />
+            <Link to="/settings" className="w-9 h-9 rounded-full bg-gradient-to-tr from-primary to-accent p-[2px] cursor-pointer hover:opacity-90 transition-opacity">
+              <div className="w-full h-full rounded-full border-2 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-slate-500">
+                <User className="w-5 h-5" />
               </div>
-            </div>
+            </Link>
           </div>
         </header>
         

@@ -1,7 +1,60 @@
+import { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
 import { Camera, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 export function GeneralTab() {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    async function loadProfile() {
+      if (!user) return;
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        if (error) throw error;
+        setProfile(data);
+      } catch (error) {
+        console.error("Error loading profile:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProfile();
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user || !profile) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profile.full_name,
+          country: profile.country,
+        })
+        .eq('id', user.id);
+      if (error) throw error;
+      alert("Profile updated successfully");
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      alert("Error saving profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-slate-500">Loading profile...</div>;
+  }
+
   return (
     <div className="space-y-10">
       {/* Personalization Section */}
@@ -9,14 +62,14 @@ export function GeneralTab() {
         <div className="flex items-center gap-4 mb-6">
           <div className="relative group">
             <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-100 border-4 border-white shadow-lg">
-              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="Profile" className="w-full h-full object-cover" />
+              <img src={profile?.profile_photo || "https://i.pravatar.cc/150?u=a042581f4e29026704d"} alt="Profile" className="w-full h-full object-cover" />
             </div>
             <button className="absolute bottom-0 right-0 p-1.5 bg-white rounded-full shadow-md border border-slate-100 text-slate-600 hover:text-primary transition-colors">
               <Camera className="w-4 h-4" />
             </button>
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Good Evening, Anu</h2>
+            <h2 className="text-xl font-bold text-slate-900">Good Evening, {profile?.full_name?.split(' ')[0] || 'User'}</h2>
             <p className="text-slate-500 text-sm">Welcome back.</p>
           </div>
         </div>
@@ -43,82 +96,52 @@ export function GeneralTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-700">Full Name</label>
-            <input type="text" defaultValue="Anu Reddy" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" />
+            <input 
+              type="text" 
+              value={profile?.full_name || ''} 
+              onChange={(e) => setProfile({...profile, full_name: e.target.value})}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" 
+            />
           </div>
           
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-700">Email Address</label>
             <div className="relative">
-              <input type="email" defaultValue="anu.reddy@example.com" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm pr-10" />
+              <input 
+                type="email" 
+                value={user?.email || ''} 
+                readOnly
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm pr-10" 
+              />
               <CheckCircle2 className="w-4 h-4 text-green-500 absolute right-3 top-1/2 -translate-y-1/2" />
             </div>
             <p className="text-xs text-slate-500">Verified</p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Mobile Number</label>
-            <div className="relative">
-              <input type="tel" defaultValue="+91 98765 43210" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm pr-10" />
-              <AlertCircle className="w-4 h-4 text-amber-500 absolute right-3 top-1/2 -translate-y-1/2" />
-            </div>
-            <div className="flex justify-between items-center">
-              <p className="text-xs text-amber-600">Verification pending</p>
-              <button className="text-xs text-primary font-medium hover:underline">Verify now</button>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Date of Birth</label>
-            <input type="date" defaultValue="1995-08-15" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Occupation</label>
-            <input type="text" defaultValue="Software Engineer" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">City</label>
-              <input type="text" defaultValue="Bengaluru" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Country</label>
-              <select className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm">
-                <option>India</option>
-                <option>USA</option>
-                <option>UK</option>
-              </select>
-            </div>
+            <label className="text-sm font-medium text-slate-700">Country</label>
+            <select 
+              value={profile?.country || 'United States'}
+              onChange={(e) => setProfile({...profile, country: e.target.value})}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+            >
+              <option value="United States">United States</option>
+              <option value="United Kingdom">United Kingdom</option>
+              <option value="Canada">Canada</option>
+              <option value="Australia">Australia</option>
+              <option value="India">India</option>
+              <option value="Germany">Germany</option>
+              <option value="France">France</option>
+              <option value="Japan">Japan</option>
+              <option value="Brazil">Brazil</option>
+              <option value="Other">Other</option>
+            </select>
           </div>
         </div>
         <div className="mt-6 flex justify-end">
-          <Button>Save Changes</Button>
-        </div>
-      </section>
-
-      <hr className="border-slate-100" />
-
-      {/* Account Statistics */}
-      <section>
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Account Statistics</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50">
-            <p className="text-xs text-slate-500 font-medium mb-1">Member Since</p>
-            <p className="text-lg font-semibold text-slate-900">Oct 2024</p>
-          </div>
-          <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50">
-            <p className="text-xs text-slate-500 font-medium mb-1">Total Transactions</p>
-            <p className="text-lg font-semibold text-slate-900">1,248</p>
-          </div>
-          <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50">
-            <p className="text-xs text-slate-500 font-medium mb-1">Financial Health</p>
-            <p className="text-lg font-semibold text-green-600">Excellent</p>
-          </div>
-          <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50">
-            <p className="text-xs text-slate-500 font-medium mb-1">AI Conversations</p>
-            <p className="text-lg font-semibold text-slate-900">34</p>
-          </div>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Changes'}
+          </Button>
         </div>
       </section>
     </div>

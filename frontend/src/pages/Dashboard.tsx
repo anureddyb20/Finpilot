@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
@@ -103,6 +104,7 @@ const PieTooltip = ({ active, payload }: any) => {
 };
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const [timeframe, setTimeframe] = useState<'Weekly' | 'Monthly' | 'Yearly'>('Monthly');
   const [insightIndex, setInsightIndex] = useState(0);
   const [showQuickActions, setShowQuickActions] = useState(false);
@@ -130,21 +132,7 @@ export function Dashboard() {
           <h1 className="text-2xl font-bold text-slate-900">Good Morning, Anu 👋</h1>
           <p className="text-slate-500">You have saved {formatInr(18200)} this month. Keep it up!</p>
         </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="relative w-full md:w-64 lg:w-80">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <input 
-              type="text" 
-              placeholder="Search transactions, goals..." 
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-            />
-          </div>
-          <button className="relative p-2 bg-white border border-slate-200 rounded-full text-slate-600 hover:bg-slate-50 transition-colors">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-          </button>
-        </div>
+
       </div>
 
       {/* Top Summary Cards */}

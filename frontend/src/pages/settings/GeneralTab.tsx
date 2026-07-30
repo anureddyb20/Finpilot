@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
-import { Camera, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Camera, CheckCircle2, AlertCircle, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 
@@ -9,6 +9,17 @@ export function GeneralTab() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfile({ ...profile, profile_photo: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   useEffect(() => {
     async function loadProfile() {
@@ -39,6 +50,7 @@ export function GeneralTab() {
         .update({
           full_name: profile.full_name,
           country: profile.country,
+          profile_photo: profile.profile_photo,
         })
         .eq('id', user.id);
       if (error) throw error;
@@ -61,12 +73,17 @@ export function GeneralTab() {
       <section>
         <div className="flex items-center gap-4 mb-6">
           <div className="relative group">
-            <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-100 border-4 border-white shadow-lg">
-              <img src={profile?.profile_photo || "https://i.pravatar.cc/150?u=a042581f4e29026704d"} alt="Profile" className="w-full h-full object-cover" />
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-100 border-4 border-white shadow-lg flex items-center justify-center text-slate-400">
+              {profile?.profile_photo ? (
+                <img src={profile.profile_photo} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <UserIcon className="w-8 h-8" />
+              )}
             </div>
-            <button className="absolute bottom-0 right-0 p-1.5 bg-white rounded-full shadow-md border border-slate-100 text-slate-600 hover:text-primary transition-colors">
+            <label className="absolute bottom-0 right-0 p-1.5 bg-white rounded-full shadow-md border border-slate-100 text-slate-600 hover:text-primary transition-colors cursor-pointer">
               <Camera className="w-4 h-4" />
-            </button>
+              <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+            </label>
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900">Good Evening, {profile?.full_name?.split(' ')[0] || 'User'}</h2>

@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
   ArrowUpRight, Plus, Bot, Edit3, Trash2, X, Target, 
-  CalendarDays, TrendingUp, Wallet, Home, 
-  Plane, Laptop,
-  Trophy, Star, Award
+  CalendarDays, TrendingUp, Wallet, Home, Plane, Laptop,
+  Trophy, Star, Award, Sliders
 } from 'lucide-react';
-import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 const formatInr = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {
@@ -18,30 +19,31 @@ const formatInr = (amount: number) => {
   }).format(amount);
 };
 
-// --- Mock Data ---
-const initialGoals = [
-  { id: '1', name: 'Emergency Fund', category: 'Finance', icon: Wallet, target: 200000, saved: 120000, deadline: '2026-12-31', color: '#10B981', monthlyRequired: 10000, priority: 'High' },
-  { id: '2', name: 'New Laptop', category: 'Electronics', icon: Laptop, target: 85000, saved: 60000, deadline: '2026-10-15', color: '#3B82F6', monthlyRequired: 8333, priority: 'Medium' },
-  { id: '3', name: 'Bali Vacation', category: 'Travel', icon: Plane, target: 150000, saved: 45000, deadline: '2027-03-01', color: '#8B5CF6', monthlyRequired: 13125, priority: 'Low' },
-  { id: '4', name: 'House Downpayment', category: 'Real Estate', icon: Home, target: 2500000, saved: 500000, deadline: '2029-01-01', color: '#F59E0B', monthlyRequired: 66666, priority: 'High' },
-];
+const getGoalIcon = (category: string) => {
+  const mapping: Record<string, any> = {
+    'Finance': Wallet,
+    'Emergency Fund': Wallet,
+    'Electronics': Laptop,
+    'Travel': Plane,
+    'Real Estate': Home,
+    'House': Home,
+    'Vehicles': Trophy,
+    'Car': Trophy,
+    'Bike': Trophy,
+    'Education': Star,
+    'Medical': Award,
+  };
+  return mapping[category] || Target;
+};
 
-const savingsTrendData = [
-  { month: 'Jan', savings: 45000 },
-  { month: 'Feb', savings: 55000 },
-  { month: 'Mar', savings: 62000 },
-  { month: 'Apr', savings: 80000 },
-  { month: 'May', savings: 95000 },
-  { month: 'Jun', savings: 110000 },
-  { month: 'Jul', savings: 125000 },
-];
-
-const categoryDistribution = initialGoals.map(g => ({ name: g.name, value: g.saved, color: g.color }));
-const allCategories = ['Finance', 'Electronics', 'Travel', 'Real Estate', 'Vehicles', 'Education', 'Medical', 'Marriage', 'Retirement', 'Business', 'Others'];
+const allCategories = ['Emergency Fund', 'Vacation', 'Car', 'Bike', 'House', 'Laptop', 'Phone', 'Education', 'Wedding', 'Retirement', 'Investment', 'Business', 'Custom'];
 const presetColors = ['#3B82F6', '#10B981', '#EF4444', '#F59E0B', '#8B5CF6', '#14B8A6', '#EC4899', '#6366F1'];
 
 export function Goals() {
-  const [goals, setGoals] = useState(initialGoals);
+  const { user } = useAuth();
+  const [goals, setGoals] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Modals state
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -50,61 +52,121 @@ export function Goals() {
   const [selectedGoalForMoney, setSelectedGoalForMoney] = useState<any>(null);
   const [addAmount, setAddAmount] = useState('');
   
+  // Simulator State
+  const [simulatedContributions, setSimulatedContributions] = useState<Record<string, number>>({});
+
   // Form State
   const [formData, setFormData] = useState({
-    name: '', category: 'Finance', target: '', saved: '', deadline: '', priority: 'Medium', color: '#3B82F6', notes: ''
+    name: '', category: 'Emergency Fund', target: '', deadline: '', 
+    priority: 'Medium', color: '#10B981', notes: '', monthly_contribution: ''
   });
 
-  const totalTarget = goals.reduce((acc, curr) => acc + curr.target, 0);
-  const totalSaved = goals.reduce((acc, curr) => acc + curr.saved, 0);
-  const totalGoals = goals.length;
-  const goalsAchieved = goals.filter(g => g.saved >= g.target).length;
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const [goalsRes, txRes] = await Promise.all([
+        supabase.from('goals').select('*').order('created_at', { ascending: false }),
+        supabase.from('transactions').select('*').not('goal_id', 'is', null).is('deleted_at', null)
+      ]);
 
-  const handleSaveGoal = (e: React.FormEvent) => {
+      if (goalsRes.data) {
+        setGoals(goalsRes.data);
+        const sim: Record<string, number> = {};
+        goalsRes.data.forEach(g => sim[g.id] = Number(g.monthly_contribution || 0));
+        setSimulatedContributions(sim);
+      }
+      if (txRes.data) setTransactions(txRes.data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchData();
+
+    if (!user) return;
+    const goalSub = supabase.channel('goal_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${user.id}` }, fetchData).subscribe();
+    const txSub = supabase.channel('tx_changes_goals').on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${user.id}` }, fetchData).subscribe();
+
+    return () => {
+      supabase.removeChannel(goalSub);
+      supabase.removeChannel(txSub);
+    };
+  }, [user, fetchData]);
+
+  // Derived Goals with live computed savings from transactions
+  const liveGoals = useMemo(() => {
+    return goals.map(g => {
+      let saved = 0;
+      transactions.forEach(t => {
+        if (t.goal_id === g.id) {
+          saved += Number(t.amount);
+        }
+      });
+      return { ...g, saved_amount: saved };
+    });
+  }, [goals, transactions]);
+
+  const totalTarget = liveGoals.reduce((acc, curr) => acc + Number(curr.target_amount), 0);
+  const totalSaved = liveGoals.reduce((acc, curr) => acc + curr.saved_amount, 0);
+  const totalGoalsCount = liveGoals.length;
+  const goalsAchieved = liveGoals.filter(g => g.saved_amount >= g.target_amount).length;
+
+  const handleSaveGoal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingGoal) {
-      setGoals(goals.map(g => g.id === editingGoal.id ? { 
-        ...g, 
-        name: formData.name, 
-        category: formData.category, 
-        target: Number(formData.target), 
-        saved: Number(formData.saved),
-        deadline: formData.deadline,
-        priority: formData.priority,
-        color: formData.color 
-      } : g));
-    } else {
-      const newG = {
-        id: Math.random().toString(),
+    if (!user) return;
+    try {
+      const payload = {
+        user_id: user.id,
         name: formData.name,
         category: formData.category,
-        icon: Target, 
-        target: Number(formData.target),
-        saved: Number(formData.saved) || 0,
-        deadline: formData.deadline,
-        color: formData.color,
-        monthlyRequired: Math.floor(Number(formData.target) / 12),
-        priority: formData.priority
+        target_amount: Number(formData.target),
+        target_date: formData.deadline || null,
+        monthly_contribution: Number(formData.monthly_contribution) || 0,
+        priority: formData.priority,
+        color_theme: formData.color,
+        notes: formData.notes,
+        icon_name: formData.category
       };
-      setGoals([...goals, newG]);
+
+      if (editingGoal) {
+        await supabase.from('goals').update(payload).eq('id', editingGoal.id);
+      } else {
+        await supabase.from('goals').insert(payload);
+      }
+      closeModals();
+    } catch (err) {
+      console.error(err);
     }
-    closeModals();
   };
 
-  const handleAddMoney = (e: React.FormEvent) => {
+  const handleAddMoney = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedGoalForMoney) {
-      setGoals(goals.map(g => g.id === selectedGoalForMoney.id ? { 
-        ...g, 
-        saved: g.saved + Number(addAmount) 
-      } : g));
+    if (!user || !selectedGoalForMoney) return;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        goal_id: selectedGoalForMoney.id,
+        amount: Number(addAmount),
+        date: today,
+        type: 'expense',
+        category: 'Goal Contribution',
+        payee: selectedGoalForMoney.name,
+        payment_method: 'Transfer',
+        notes: `Added funds to ${selectedGoalForMoney.name}`
+      });
+      closeModals();
+    } catch (err) {
+      console.error(err);
     }
-    closeModals();
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm("Are you sure you want to permanently delete this goal?")) {
-      setGoals(goals.filter(g => g.id !== id));
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to permanently delete this goal? All associated contribution records will remain in transactions but unlink from this goal.")) {
+      await supabase.from('goals').delete().eq('id', id);
     }
   };
 
@@ -112,13 +174,17 @@ export function Goals() {
     if (goal) {
       setEditingGoal(goal);
       setFormData({ 
-        name: goal.name, category: goal.category, target: goal.target.toString(), 
-        saved: goal.saved.toString(), deadline: goal.deadline, priority: goal.priority, 
-        color: goal.color, notes: '' 
+        name: goal.name, category: goal.category || 'Custom', target: goal.target_amount.toString(), 
+        deadline: goal.target_date || '', priority: goal.priority || 'Medium', 
+        color: goal.color_theme || '#3B82F6', notes: goal.notes || '',
+        monthly_contribution: goal.monthly_contribution?.toString() || ''
       });
     } else {
       setEditingGoal(null);
-      setFormData({ name: '', category: 'Finance', target: '', saved: '', deadline: '', priority: 'Medium', color: '#3B82F6', notes: '' });
+      setFormData({ 
+        name: '', category: 'Emergency Fund', target: '', deadline: '', 
+        priority: 'Medium', color: '#10B981', notes: '', monthly_contribution: '' 
+      });
     }
     setIsGoalModalOpen(true);
   };
@@ -133,6 +199,64 @@ export function Goals() {
     setIsGoalModalOpen(false);
     setIsAddMoneyModalOpen(false);
   };
+
+  // AI Insights Generation
+  const insights = useMemo(() => {
+    const alerts = [];
+    liveGoals.forEach(g => {
+      const p = (g.saved_amount / g.target_amount) * 100;
+      if (p >= 100) alerts.push(`Congratulations! You have completed your ${g.name} goal!`);
+      else if (p >= 80) alerts.push(`You are almost there! Only ${formatInr(g.target_amount - g.saved_amount)} left for ${g.name}.`);
+      
+      if (g.monthly_contribution > 0 && p < 100) {
+        const remainingMonths = (g.target_amount - g.saved_amount) / g.monthly_contribution;
+        const speedUpMonths = (g.target_amount - g.saved_amount) / (Number(g.monthly_contribution) + 2000);
+        const savedTime = remainingMonths - speedUpMonths;
+        if (savedTime >= 1) {
+          alerts.push(`Increasing ${g.name} contribution by ₹2,000/mo finishes it ${Math.floor(savedTime)} months earlier.`);
+        }
+      }
+    });
+    if (alerts.length === 0 && liveGoals.length > 0) alerts.push("Keep contributing consistently to hit your targets faster.");
+    if (liveGoals.length === 0) alerts.push("Create your first goal to start getting AI insights.");
+    return alerts;
+  }, [liveGoals]);
+
+  // Chart Data preparation
+  const categoryDistribution = liveGoals.map(g => ({ name: g.name, value: g.saved_amount, color: g.color_theme || '#3B82F6' })).filter(c => c.value > 0);
+  
+  // Cumulative Savings Trend
+  const savingsTrendData = useMemo(() => {
+    const months: Record<string, number> = {};
+    let runningTotal = 0;
+    
+    // Sort transactions chronologically
+    const sortedTx = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    sortedTx.forEach(t => {
+      const d = new Date(t.date);
+      const monthStr = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      runningTotal += Number(t.amount);
+      months[monthStr] = runningTotal;
+    });
+
+    return Object.entries(months).map(([month, savings]) => ({ month, savings }));
+  }, [transactions]);
+
+  // Calculate Forecast Completion Date
+  const calculateForecastDate = (target: number, saved: number, monthly: number) => {
+    if (saved >= target) return "Completed";
+    if (!monthly || monthly <= 0) return "No Forecast";
+    const remaining = target - saved;
+    const monthsRemaining = Math.ceil(remaining / monthly);
+    const futureDate = new Date();
+    futureDate.setMonth(futureDate.getMonth() + monthsRemaining);
+    return futureDate.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+  };
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading Goals...</div>;
+  }
 
   return (
     <div className="space-y-6 pb-20 relative min-h-screen">
@@ -151,28 +275,19 @@ export function Goals() {
         <Card>
           <CardContent className="p-5">
             <p className="text-sm font-medium text-slate-500 mb-1">Total Goals</p>
-            <h4 className="text-2xl font-bold text-slate-900">{totalGoals}</h4>
-            <div className="mt-2 flex items-center text-sm font-medium text-slate-500">
-              <span className="text-emerald-600 flex items-center mr-1"><ArrowUpRight className="w-4 h-4"/> 1</span> vs last month
-            </div>
+            <h4 className="text-2xl font-bold text-slate-900">{totalGoalsCount}</h4>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <p className="text-sm font-medium text-slate-500 mb-1">Total Goal Value</p>
             <h4 className="text-2xl font-bold text-slate-900">{formatInr(totalTarget)}</h4>
-            <div className="mt-2 flex items-center text-sm font-medium text-slate-500">
-              <span className="text-emerald-600 flex items-center mr-1"><ArrowUpRight className="w-4 h-4"/> 12%</span> vs last month
-            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
             <p className="text-sm font-medium text-slate-500 mb-1">Total Saved</p>
             <h4 className="text-2xl font-bold text-slate-900">{formatInr(totalSaved)}</h4>
-            <div className="mt-2 flex items-center text-sm font-medium text-slate-500">
-              <span className="text-emerald-600 flex items-center mr-1"><TrendingUp className="w-4 h-4"/> 8%</span> vs last month
-            </div>
           </CardContent>
         </Card>
         <Card>
@@ -180,46 +295,49 @@ export function Goals() {
             <p className="text-sm font-medium text-slate-500 mb-1">Goals Achieved</p>
             <h4 className="text-2xl font-bold text-slate-900">{goalsAchieved}</h4>
             <div className="mt-2 flex items-center text-sm font-medium text-slate-500">
-              <span className="text-emerald-600 flex items-center mr-1"><Trophy className="w-4 h-4"/> 1</span> lifetime
+              <span className="text-emerald-600 flex items-center mr-1"><Trophy className="w-4 h-4"/></span> lifetime
             </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Left Column: Active Goals */}
+        {/* Left Column: Active Goals & Simulator */}
         <div className="xl:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-slate-900">Active Goals</h3>
-            <button className="text-sm font-medium text-primary hover:text-primary/80">View Timeline</button>
           </div>
           
           <div className="grid grid-cols-1 gap-4">
-            {goals.map((g) => {
-              const percent = Math.min((g.saved / g.target) * 100, 100);
-              const remaining = g.target - g.saved;
+            {liveGoals.length > 0 ? liveGoals.map((g) => {
+              const percent = Math.min((g.saved_amount / g.target_amount) * 100, 100);
+              const remaining = g.target_amount - g.saved_amount;
+              const Icon = getGoalIcon(g.category || g.icon_name);
               
               return (
                 <Card key={g.id} className="hover:shadow-md transition-all group overflow-hidden relative">
-                  <div className="absolute top-0 left-0 w-1 h-full" style={{backgroundColor: g.color}}></div>
+                  <div className="absolute top-0 left-0 w-1 h-full" style={{backgroundColor: g.color_theme || '#3B82F6'}}></div>
                   <CardContent className="p-5 pl-6">
                     <div className="flex flex-col md:flex-row justify-between gap-4 md:items-start mb-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-50 shadow-sm" style={{ color: g.color }}>
-                          {<g.icon className="w-6 h-6" />}
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-50 shadow-sm" style={{ color: g.color_theme || '#3B82F6' }}>
+                          <Icon className="w-6 h-6" />
                         </div>
                         <div>
                           <h4 className="font-bold text-lg text-slate-900">{g.name}</h4>
-                          <div className="flex items-center gap-2 text-xs font-medium mt-1">
-                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{g.category}</span>
-                            <span className="text-slate-400 flex items-center gap-1"><CalendarDays className="w-3 h-3"/> {g.deadline}</span>
+                          <div className="flex flex-wrap items-center gap-2 text-xs font-medium mt-1">
+                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{g.category || 'Custom'}</span>
+                            {g.target_date && <span className="text-slate-400 flex items-center gap-1"><CalendarDays className="w-3 h-3"/> {new Date(g.target_date).toLocaleDateString()}</span>}
+                            {g.priority === 'High' && <span className="text-red-500 font-bold px-1.5 py-0.5 bg-red-50 rounded text-[10px] uppercase">High Priority</span>}
                           </div>
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={() => openAddMoneyModal(g)} className="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg text-sm font-medium transition-colors">
-                          Add Funds
-                        </button>
+                        {percent < 100 && (
+                          <button onClick={() => openAddMoneyModal(g)} className="px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-lg text-sm font-medium transition-colors">
+                            Add Funds
+                          </button>
+                        )}
                         <button onClick={() => openGoalModal(g)} className="p-1.5 text-slate-400 hover:text-primary hover:bg-slate-50 rounded-lg"><Edit3 className="w-4 h-4"/></button>
                         <button onClick={() => handleDelete(g.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
                       </div>
@@ -229,11 +347,11 @@ export function Goals() {
                       <div className="flex justify-between items-end">
                         <div>
                           <span className="text-xs text-slate-500 block mb-0.5">Saved so far</span>
-                          <span className="font-bold text-xl text-slate-900">{formatInr(g.saved)}</span>
+                          <span className="font-bold text-xl text-slate-900">{formatInr(g.saved_amount)}</span>
                         </div>
                         <div className="text-right">
                           <span className="text-xs text-slate-500 block mb-0.5">Target</span>
-                          <span className="font-semibold text-slate-700">{formatInr(g.target)}</span>
+                          <span className="font-semibold text-slate-700">{formatInr(g.target_amount)}</span>
                         </div>
                       </div>
                       
@@ -244,7 +362,7 @@ export function Goals() {
                             animate={{ width: `${percent}%` }} 
                             transition={{ duration: 1, ease: "easeOut" }}
                             className="h-full rounded-full" 
-                            style={{backgroundColor: g.color}}
+                            style={{backgroundColor: percent >= 100 ? '#10B981' : (g.color_theme || '#3B82F6')}}
                           ></motion.div>
                         </div>
                         {/* Milestone Markers */}
@@ -255,35 +373,88 @@ export function Goals() {
                       
                       <div className="flex justify-between text-xs mt-1">
                         <span className="text-slate-500 font-medium">{percent.toFixed(0)}% Completed</span>
-                        <span className="text-slate-500 font-medium">Req: {formatInr(g.monthlyRequired)}/mo</span>
+                        <span className="text-slate-500 font-medium">Contrb: {formatInr(g.monthly_contribution || 0)}/mo</span>
                         <span className="font-medium text-slate-600">{formatInr(remaining > 0 ? remaining : 0)} remaining</span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               );
-            })}
+            }) : (
+              <div className="col-span-1 p-10 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
+                <Target className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <h3 className="text-lg font-semibold text-slate-900 mb-1">No Goals Created</h3>
+                <p className="text-slate-500 text-sm mb-4">Start your financial journey by creating your first savings goal.</p>
+                <button onClick={() => openGoalModal()} className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors inline-flex items-center gap-2">
+                  <Plus className="w-4 h-4" /> Create Goal
+                </button>
+              </div>
+            )}
           </div>
 
+          {/* What-If Goal Simulator */}
+          {liveGoals.length > 0 && (
+            <Card className="border-emerald-100">
+              <CardHeader className="bg-emerald-50/50 border-b border-emerald-100">
+                <CardTitle className="flex items-center gap-2 text-emerald-900">
+                  <Sliders className="w-5 h-5 text-emerald-600" />
+                  What-If Forecast Simulator
+                </CardTitle>
+                <p className="text-sm text-emerald-600/80 mt-1">Adjust monthly contributions to instantly preview new completion dates</p>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-6">
+                  {liveGoals.filter(g => g.saved_amount < g.target_amount).map(g => (
+                    <div key={g.id} className="border-b border-slate-100 pb-5 last:border-0 last:pb-0">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h4 className="font-semibold text-slate-800">{g.name}</h4>
+                          <p className="text-xs text-slate-500 mt-1">Simulated Contribution: <strong className="text-emerald-600">{formatInr(simulatedContributions[g.id] || 0)}/mo</strong></p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500">Projected Completion</p>
+                          <p className="font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded mt-1">
+                            {calculateForecastDate(g.target_amount, g.saved_amount, simulatedContributions[g.id] || 0)}
+                          </p>
+                        </div>
+                      </div>
+                      <input 
+                        type="range" min="0" max={Math.max(g.target_amount / 2, 50000)} step="500"
+                        value={simulatedContributions[g.id] || 0}
+                        onChange={(e) => setSimulatedContributions({...simulatedContributions, [g.id]: Number(e.target.value)})}
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                      />
+                    </div>
+                  ))}
+                  {liveGoals.filter(g => g.saved_amount < g.target_amount).length === 0 && (
+                    <p className="text-sm text-slate-500 text-center py-4">All your goals are complete! No forecasts needed.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Analytics Charts */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Total Savings Growth</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[280px] w-full">
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={savingsTrendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(value) => `₹${value/1000}k`} />
-                    <Tooltip cursor={{stroke: '#e2e8f0', strokeWidth: 2}} contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                    <Line type="monotone" dataKey="savings" name="Total Saved" stroke="#10B981" strokeWidth={3} dot={{r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+          {savingsTrendData.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Cumulative Savings Growth</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[280px] w-full">
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={savingsTrendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(value) => `₹${(value/1000).toFixed(0)}k`} />
+                      <Tooltip cursor={{stroke: '#e2e8f0', strokeWidth: 2}} contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                      <Line type="monotone" dataKey="savings" name="Total Saved" stroke="#10B981" strokeWidth={3} dot={{r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column: AI Coach & Analytics */}
@@ -305,59 +476,53 @@ export function Goals() {
               </div>
               
               <div className="space-y-3">
-                <div className="bg-white p-3 rounded-lg border border-emerald-50 shadow-sm">
-                  <p className="text-sm flex items-start gap-2">
-                    <Star className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <span>You have reached <strong>60%</strong> of your Emergency Fund! You are currently ahead of schedule.</span>
-                  </p>
-                </div>
-                <div className="bg-white p-3 rounded-lg border border-emerald-50 shadow-sm">
-                  <p className="text-sm flex items-start gap-2">
-                    <TrendingUp className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                    <span>Increasing your monthly savings for the <strong>Laptop Goal</strong> by ₹2,000 will help you reach it 2 months earlier.</span>
-                  </p>
-                </div>
-                <div className="bg-white p-3 rounded-lg border border-emerald-50 shadow-sm">
-                  <p className="text-sm flex items-start gap-2">
-                    <Target className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                    <span>You saved ₹2,500 from your Food Budget last month. Would you like to allocate it to your Vacation Goal?</span>
-                  </p>
-                </div>
+                {insights.map((msg, idx) => (
+                  <div key={idx} className="bg-white p-3 rounded-lg border border-emerald-50 shadow-sm">
+                    <p className="text-sm flex items-start gap-2">
+                      {msg.includes('Congratulations') ? <Trophy className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" /> : 
+                       msg.includes('Increasing') ? <TrendingUp className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" /> :
+                       <Star className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />}
+                      <span>{msg}</span>
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
           {/* Goal Distribution Pie */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Goal Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[220px] w-full flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie data={categoryDistribution} cx="50%" cy="50%" innerRadius={65} outerRadius={90} paddingAngle={2} dataKey="value" stroke="none">
-                      {categoryDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '8px', fontSize: '12px' }} formatter={(value: number) => formatInr(value)} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="space-y-2 mt-4">
-                {categoryDistribution.slice(0, 4).map((c, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-md" style={{backgroundColor: c.color}}></div>
-                      <span className="text-slate-600 font-medium">{c.name}</span>
+          {categoryDistribution.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Goal Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[220px] w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={categoryDistribution} cx="50%" cy="50%" innerRadius={65} outerRadius={90} paddingAngle={2} dataKey="value" stroke="none">
+                        {categoryDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: '8px', fontSize: '12px' }} formatter={(value: number) => formatInr(value)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-2 mt-4">
+                  {categoryDistribution.slice(0, 5).map((c, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-md" style={{backgroundColor: c.color}}></div>
+                        <span className="text-slate-600 font-medium">{c.name}</span>
+                      </div>
+                      <span className="font-bold text-slate-900">{formatInr(c.value)}</span>
                     </div>
-                    <span className="font-bold text-slate-900">{formatInr(c.value)}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Achievements */}
           <Card>
@@ -365,34 +530,33 @@ export function Goals() {
               <CardTitle>Recent Achievements</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <Award className="w-5 h-5 text-amber-600" />
+              <div className={`flex items-center gap-3 p-3 rounded-lg border ${totalSaved > 0 ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100 opacity-60 grayscale'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${totalSaved > 0 ? 'bg-amber-100' : 'bg-slate-200'}`}>
+                  <Award className={`w-5 h-5 ${totalSaved > 0 ? 'text-amber-600' : 'text-slate-500'}`} />
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-amber-900">Savings Milestone</h4>
-                  <p className="text-xs text-amber-700">Crossed ₹5,00,000 in total savings.</p>
+                  <h4 className={`font-bold text-sm ${totalSaved > 0 ? 'text-amber-900' : 'text-slate-700'}`}>Saver Journey Started</h4>
+                  <p className={`text-xs ${totalSaved > 0 ? 'text-amber-700' : 'text-slate-500'}`}>Made your first contribution.</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100 opacity-60 grayscale">
-                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
-                  <Trophy className="w-5 h-5 text-slate-500" />
+              <div className={`flex items-center gap-3 p-3 rounded-lg border ${goalsAchieved > 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100 opacity-60 grayscale'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${goalsAchieved > 0 ? 'bg-emerald-100' : 'bg-slate-200'}`}>
+                  <Trophy className={`w-5 h-5 ${goalsAchieved > 0 ? 'text-emerald-600' : 'text-slate-500'}`} />
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-slate-700">First Goal Completed</h4>
-                  <p className="text-xs text-slate-500">Achieve 100% on any goal to unlock.</p>
+                  <h4 className={`font-bold text-sm ${goalsAchieved > 0 ? 'text-emerald-900' : 'text-slate-700'}`}>First Goal Completed</h4>
+                  <p className={`text-xs ${goalsAchieved > 0 ? 'text-emerald-700' : 'text-slate-500'}`}>Achieve 100% on any goal to unlock.</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-
         </div>
       </div>
 
       {/* Add / Edit Goal Modal */}
       <AnimatePresence>
         {isGoalModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
@@ -402,7 +566,7 @@ export function Goals() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h2 className="text-lg font-bold text-slate-900">{editingGoal ? 'Edit Goal' : 'Create New Goal'}</h2>
@@ -421,20 +585,20 @@ export function Goals() {
                       <input required type="number" value={formData.target} onChange={e => setFormData({...formData, target: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Current Savings (₹)</label>
-                      <input type="number" value={formData.saved} onChange={e => setFormData({...formData, saved: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary" placeholder="0" />
+                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Monthly Contrib. (₹)</label>
+                      <input type="number" value={formData.monthly_contribution} onChange={e => setFormData({...formData, monthly_contribution: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary" placeholder="0" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
-                      <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                      <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
                         {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">Priority</label>
-                      <select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                      <select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
                         <option>High</option>
                         <option>Medium</option>
                         <option>Low</option>
@@ -446,7 +610,11 @@ export function Goals() {
                     <input type="date" value={formData.deadline} onChange={e => setFormData({...formData, deadline: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Goal Color</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes</label>
+                    <textarea rows={2} value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary" placeholder="Optional notes..." />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Goal Theme Color</label>
                     <div className="flex flex-wrap gap-3">
                       {presetColors.map(c => (
                         <button 
@@ -474,7 +642,7 @@ export function Goals() {
       {/* Add Money Modal */}
       <AnimatePresence>
         {isAddMoneyModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
@@ -522,7 +690,7 @@ export function Goals() {
               <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
                 <button type="button" onClick={closeModals} className="flex-1 py-2.5 text-slate-700 font-medium hover:bg-slate-100 rounded-xl transition-colors text-sm">Cancel</button>
                 <button type="submit" form="add-money-form" className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-sm shadow-emerald-200 text-sm">
-                  Add Money
+                  Transfer Money
                 </button>
               </div>
             </motion.div>

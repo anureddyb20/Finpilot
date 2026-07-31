@@ -155,7 +155,7 @@ export function Dashboard() {
     if (!user) return;
     try {
       const [txRes, bgRes, glRes, recRes] = await Promise.all([
-        supabase.from('transactions').select('*').is('deleted_at', null).order('date', { ascending: false }).order('time', { ascending: false }),
+        supabase.from('transactions').select('*').order('date', { ascending: false }),
         supabase.from('budgets').select('*'),
         supabase.from('goals').select('*'),
         supabase.from('recurring_payments').select('*')
@@ -766,18 +766,20 @@ export function Dashboard() {
               <CardTitle>Upcoming Bills</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {recurring.length > 0 ? recurring.map((bill) => (
+              {recurring.length > 0 ? recurring.map((bill) => {
+                const isUrgent = bill.status === 'Overdue' || (bill.next_due_date && new Date(bill.next_due_date).getTime() < Date.now() + 86400000 * 3);
+                return (
                 <div key={bill.id} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-50 hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className={`w-2 h-8 rounded-full ${bill.is_urgent ? 'bg-red-500' : 'bg-slate-300'}`}></div>
+                    <div className={`w-2 h-8 rounded-full ${isUrgent ? 'bg-red-500' : 'bg-slate-300'}`}></div>
                     <div>
                       <p className="font-medium text-sm text-slate-900">{bill.name}</p>
-                      <p className={`text-xs ${bill.is_urgent ? 'text-red-500 font-medium' : 'text-slate-500'}`}>Due Date: {bill.due_date}</p>
+                      <p className={`text-xs ${isUrgent ? 'text-red-500 font-medium' : 'text-slate-500'}`}>Due Date: {bill.next_due_date ? new Date(bill.next_due_date).toLocaleDateString() : 'N/A'}</p>
                     </div>
                   </div>
                   <span className="font-semibold text-slate-900">{formatInr(bill.amount)}</span>
                 </div>
-              )) : (
+              )}) : (
                 <div className="text-center py-4 text-slate-500 text-sm">No recurring payments found.</div>
               )}
             </CardContent>

@@ -232,18 +232,23 @@ export function RecurringPayments() {
       const { error: updateError } = await supabase.from('recurring_payments').update({ next_due_date: newDate }).eq('id', p.id);
       if (updateError) throw updateError;
       
+      const now = new Date();
+      const robustTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
+
       const { error: insertError } = await supabase.from('transactions').insert({
           user_id: user.id,
           amount: p.amount,
           date: today,
-          time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: "numeric", minute: "numeric" }),
+          time: robustTime,
           type: 'expense',
           category: txCategory,
-          merchant: p.merchant || p.name,
+          merchant: p.merchant || p.name || 'Unknown',
           method: p.payment_method || 'Net Banking',
           notes: `Auto-generated from Recurring Payments`
         });
       if (insertError) throw insertError;
+      
+      alert(`Success! Marked ${p.name} as paid. Next due date is now ${newDate}. The transaction has been added to your ledger.`);
     } catch (err: any) {
       console.error(err);
       alert("Failed to mark as paid: " + (err.message || "Unknown error"));

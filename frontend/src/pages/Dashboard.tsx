@@ -102,7 +102,7 @@ export function Dashboard() {
     setIsSubmitting(true);
     try {
       const today = new Date();
-      await supabase.from('budgets').insert({
+      const { error } = await supabase.from('budgets').insert({
         user_id: user.id,
         category: newBudget.category,
         limit_amount: Number(newBudget.limit),
@@ -110,10 +110,12 @@ export function Dashboard() {
         month: today.getMonth(),
         year: today.getFullYear()
       });
+      if (error) throw error;
       setShowBudgetModal(false);
       setNewBudget({ category: 'Food', limit: '' });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert("Failed to create budget: " + (err.message || "Unknown error"));
     }
     setIsSubmitting(false);
   };
@@ -123,7 +125,7 @@ export function Dashboard() {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      await supabase.from('goals').insert({
+      const { error } = await supabase.from('goals').insert({
         user_id: user.id,
         name: newGoal.name,
         target_amount: Number(newGoal.target),
@@ -132,10 +134,12 @@ export function Dashboard() {
         color_theme: 'blue',
         icon_name: 'Target'
       });
+      if (error) throw error;
       setShowGoalModal(false);
       setNewGoal({ name: '', target: '', date: '' });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert("Failed to create goal: " + (err.message || "Unknown error"));
     }
     setIsSubmitting(false);
   };
@@ -813,8 +817,8 @@ export function Dashboard() {
               className="flex flex-col gap-2 mb-2"
             >
               {[
-                { label: 'Create Goal', icon: Target, color: 'text-purple-600', bg: 'bg-purple-50', action: () => setShowGoalModal(true) },
-                { label: 'Create Budget', icon: Activity, color: 'text-orange-600', bg: 'bg-orange-50', action: () => setShowBudgetModal(true) },
+                { label: 'Create Goal', icon: Target, color: 'text-purple-600', bg: 'bg-purple-50', action: () => { setShowGoalModal(true); setShowQuickActions(false); } },
+                { label: 'Create Budget', icon: Activity, color: 'text-orange-600', bg: 'bg-orange-50', action: () => { setShowBudgetModal(true); setShowQuickActions(false); } },
                 { label: 'Add Transaction', icon: Plus, color: 'text-emerald-600', bg: 'bg-emerald-50', action: () => navigate('/transactions') },
               ].map((action, i) => (
                 <motion.button 

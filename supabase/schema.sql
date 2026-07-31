@@ -161,3 +161,108 @@ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
+
+
+-- 14. Create Budgets Table
+CREATE TABLE public.budgets (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  category TEXT NOT NULL,
+  limit_amount NUMERIC(15, 2) NOT NULL,
+  spent_amount NUMERIC(15, 2) DEFAULT 0,
+  month INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own budgets" 
+ON public.budgets FOR ALL 
+USING (auth.uid() = user_id);
+
+
+-- 15. Create Goals Table
+CREATE TABLE public.goals (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  target_amount NUMERIC(15, 2) NOT NULL,
+  saved_amount NUMERIC(15, 2) DEFAULT 0,
+  target_date DATE,
+  icon_name TEXT DEFAULT 'Target',
+  color_theme TEXT DEFAULT 'blue',
+  status TEXT DEFAULT 'In Progress',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.goals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own goals" 
+ON public.goals FOR ALL 
+USING (auth.uid() = user_id);
+
+
+-- 16. Create Recurring Payments Table
+CREATE TABLE public.recurring_payments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  amount NUMERIC(15, 2) NOT NULL,
+  due_date INTEGER NOT NULL, -- Day of the month
+  category TEXT NOT NULL,
+  frequency TEXT DEFAULT 'Monthly',
+  is_urgent BOOLEAN DEFAULT false,
+  status TEXT DEFAULT 'Active',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.recurring_payments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own recurring payments" 
+ON public.recurring_payments FOR ALL 
+USING (auth.uid() = user_id);
+
+
+-- 17. Create Notifications Table
+CREATE TABLE public.notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  type TEXT DEFAULT 'info',
+  is_read BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own notifications" 
+ON public.notifications FOR ALL 
+USING (auth.uid() = user_id);
+
+
+-- 18. Enable Realtime for all new tables
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'budgets') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.budgets;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'goals') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.goals;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'recurring_payments') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.recurring_payments;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'notifications') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+  END IF;
+EXCEPTION
+  WHEN undefined_object THEN NULL;
+END $$;

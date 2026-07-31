@@ -1,58 +1,16 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
-  ArrowUpRight, Wallet, PiggyBank, CreditCard, TrendingUp,
+  ArrowUpRight, ArrowDownRight, Wallet, PiggyBank, CreditCard, TrendingUp,
   Search, Bell, Plus, Minus, Send, Target, Sparkles, Brain, Clock, 
   ShoppingCart, Utensils, Zap, Car, Briefcase, Activity, CheckCircle2,
-  AlertTriangle, Laptop, Plane, FileText
+  AlertTriangle, Laptop, Plane, FileText, RotateCcw, Monitor
 } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell } from 'recharts';
-
-// Data Mocks
-const cashFlowDataWeekly = [
-  { name: 'Mon', income: 14000, expense: 4000 },
-  { name: 'Tue', income: 3000, expense: 1980 },
-  { name: 'Wed', income: 20000, expense: 9800 },
-  { name: 'Thu', income: 2780, expense: 3908 },
-  { name: 'Fri', income: 1890, expense: 4800 },
-  { name: 'Sat', income: 2390, expense: 3800 },
-  { name: 'Sun', income: 3490, expense: 4300 },
-];
-const cashFlowDataMonthly = [
-  { name: 'Jan', income: 84000, expense: 31000 },
-  { name: 'Feb', income: 81000, expense: 33000 },
-  { name: 'Mar', income: 88000, expense: 30000 },
-  { name: 'Apr', income: 82000, expense: 34000 },
-  { name: 'May', income: 85000, expense: 32000 },
-  { name: 'Jun', income: 83000, expense: 31500 },
-  { name: 'Jul', income: 84500, expense: 32400 },
-];
-const cashFlowDataYearly = [
-  { name: '2021', income: 800000, expense: 400000 },
-  { name: '2022', income: 950000, expense: 450000 },
-  { name: '2023', income: 1050000, expense: 500000 },
-  { name: '2024', income: 1200000, expense: 550000 },
-];
-
-const spendingData = [
-  { name: 'Food', value: 12500, color: '#F59E0B' },
-  { name: 'Rent', value: 12000, color: '#3B82F6' },
-  { name: 'Bills', value: 3450, color: '#10B981' },
-  { name: 'Travel', value: 2500, color: '#8B5CF6' },
-  { name: 'Shopping', value: 4500, color: '#EC4899' },
-  { name: 'Healthcare', value: 1500, color: '#EF4444' },
-  { name: 'Entertainment', value: 3000, color: '#14B8A6' },
-  { name: 'Others', value: 2000, color: '#64748B' },
-];
-
-const insights = [
-  "You spent 18% more on restaurants this month.",
-  "Reducing dining expenses by ₹2,000 will help you reach your Laptop Goal one month earlier.",
-  "Your electricity bill has increased for three consecutive months.",
-  "You currently save 61% of your monthly income, which is better than your average over the last six months."
-];
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 // Helper to format currency
 const formatInr = (amount: number) => {
@@ -62,6 +20,27 @@ const formatInr = (amount: number) => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(amount);
+};
+
+const getCategoryStyles = (category: string) => {
+  const mapping: Record<string, any> = {
+    'Food': { icon: Utensils, bg: 'bg-amber-50', text: 'text-amber-600', color: '#F59E0B' },
+    'Salary': { icon: Briefcase, bg: 'bg-emerald-50', text: 'text-emerald-600', color: '#10B981' },
+    'Shopping': { icon: ShoppingCart, bg: 'bg-pink-50', text: 'text-pink-600', color: '#EC4899' },
+    'Travel': { icon: Car, bg: 'bg-blue-50', text: 'text-blue-600', color: '#3B82F6' },
+    'Bills': { icon: Zap, bg: 'bg-yellow-50', text: 'text-yellow-600', color: '#EAB308' },
+    'Entertainment': { icon: Monitor, bg: 'bg-purple-50', text: 'text-purple-600', color: '#8B5CF6' },
+    'Refund': { icon: RotateCcw, bg: 'bg-slate-100', text: 'text-slate-600', color: '#64748B' },
+    'Freelancing': { icon: Briefcase, bg: 'bg-emerald-50', text: 'text-emerald-600', color: '#10B981' },
+    'Investment': { icon: ArrowUpRight, bg: 'bg-indigo-50', text: 'text-indigo-600', color: '#6366F1' },
+    'Rent': { icon: FileText, bg: 'bg-orange-50', text: 'text-orange-600', color: '#F97316' },
+    'Healthcare': { icon: FileText, bg: 'bg-red-50', text: 'text-red-600', color: '#EF4444' },
+    'Education': { icon: FileText, bg: 'bg-blue-50', text: 'text-blue-600', color: '#3B82F6' },
+    'Business': { icon: Briefcase, bg: 'bg-slate-50', text: 'text-slate-600', color: '#64748B' },
+    'Insurance': { icon: FileText, bg: 'bg-teal-50', text: 'text-teal-600', color: '#14B8A6' },
+    'Taxes': { icon: FileText, bg: 'bg-red-50', text: 'text-red-600', color: '#EF4444' },
+  };
+  return mapping[category] || { icon: FileText, bg: 'bg-slate-100', text: 'text-slate-600', color: '#94A3B8' };
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -75,7 +54,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           <p className="text-blue-600 text-sm font-medium">Income: {formatInr(income)}</p>
           <p className="text-emerald-600 text-sm font-medium">Expense: {formatInr(expense)}</p>
           <div className="border-t pt-2 mt-2">
-            <p className="text-slate-900 font-bold text-sm">Net Savings: {formatInr(income - expense)}</p>
+            <p className="text-slate-900 font-bold text-sm">Net Flow: {formatInr(income - expense)}</p>
           </div>
         </div>
       </div>
@@ -84,11 +63,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const PieTooltip = ({ active, payload }: any) => {
+const PieTooltip = ({ active, payload, total }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
-    const total = spendingData.reduce((acc, curr) => acc + curr.value, 0);
-    const percentage = ((data.value / total) * 100).toFixed(1);
+    const percentage = ((data.value / (total || 1)) * 100).toFixed(1);
     
     return (
       <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-100 z-50">
@@ -105,197 +83,358 @@ const PieTooltip = ({ active, payload }: any) => {
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
   const [timeframe, setTimeframe] = useState<'Weekly' | 'Monthly' | 'Yearly'>('Monthly');
   const [insightIndex, setInsightIndex] = useState(0);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // DB States
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [goals, setGoals] = useState<any[]>([]);
+  const [recurring, setRecurring] = useState<any[]>([]);
+
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const [txRes, bgRes, glRes, recRes] = await Promise.all([
+        supabase.from('transactions').select('*').is('deleted_at', null).order('date', { ascending: false }).order('time', { ascending: false }),
+        supabase.from('budgets').select('*'),
+        supabase.from('goals').select('*'),
+        supabase.from('recurring_payments').select('*')
+      ]);
+
+      if (txRes.data) setTransactions(txRes.data);
+      if (bgRes.data) setBudgets(bgRes.data);
+      if (glRes.data) setGoals(glRes.data);
+      if (recRes.data) setRecurring(recRes.data);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
+    fetchData();
+
+    if (!user) return;
+    const txSub = supabase.channel('tx_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${user.id}` }, fetchData).subscribe();
+    const bgSub = supabase.channel('bg_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'budgets', filter: `user_id=eq.${user.id}` }, fetchData).subscribe();
+    const glSub = supabase.channel('gl_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${user.id}` }, fetchData).subscribe();
+    const recSub = supabase.channel('rec_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'recurring_payments', filter: `user_id=eq.${user.id}` }, fetchData).subscribe();
+
+    return () => {
+      supabase.removeChannel(txSub);
+      supabase.removeChannel(bgSub);
+      supabase.removeChannel(glSub);
+      supabase.removeChannel(recSub);
+    };
+  }, [user, fetchData]);
+
+  // Derived Calculations
+  const metrics = useMemo(() => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+    let totalInc = 0;
+    let totalExp = 0;
+    let currMonthInc = 0;
+    let currMonthExp = 0;
+    let lastMonthInc = 0;
+    let lastMonthExp = 0;
+
+    const categoryExp: Record<string, number> = {};
+
+    transactions.forEach(t => {
+      const amt = Number(t.amount) || 0;
+      const tDate = new Date(t.date);
+      const isCurrMonth = tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+      const isLastMonth = tDate.getMonth() === lastMonth && tDate.getFullYear() === lastMonthYear;
+
+      if (t.type === 'income') {
+        totalInc += amt;
+        if (isCurrMonth) currMonthInc += amt;
+        if (isLastMonth) lastMonthInc += amt;
+      } else if (t.type === 'expense') {
+        totalExp += amt;
+        if (isCurrMonth) {
+          currMonthExp += amt;
+          categoryExp[t.category] = (categoryExp[t.category] || 0) + amt;
+        }
+        if (isLastMonth) lastMonthExp += amt;
+      }
+    });
+
+    const incChange = lastMonthInc ? ((currMonthInc - lastMonthInc) / lastMonthInc) * 100 : 0;
+    const expChange = lastMonthExp ? ((currMonthExp - lastMonthExp) / lastMonthExp) * 100 : 0;
+    const balance = totalInc - totalExp;
+    
+    // For net savings, let's compare all time savings to something? Or just month's savings?
+    // Let's use month's savings for the card.
+    const currMonthSavings = currMonthInc - currMonthExp;
+    const lastMonthSavings = lastMonthInc - lastMonthExp;
+    const savChange = lastMonthSavings ? ((currMonthSavings - lastMonthSavings) / Math.abs(lastMonthSavings)) * 100 : 0;
+
+    // Format Spending Data for Pie Chart
+    const spendingData = Object.entries(categoryExp)
+      .map(([name, value]) => ({ name, value, color: getCategoryStyles(name).color }))
+      .sort((a, b) => b.value - a.value);
+
+    return {
+      balance, currMonthInc, currMonthExp, currMonthSavings,
+      incChange, expChange, savChange, spendingData
+    };
+  }, [transactions]);
+
+  const insights = useMemo(() => {
+    const list = [];
+    if (metrics.currMonthSavings > 0) {
+      list.push(`You saved ${formatInr(metrics.currMonthSavings)} this month. Great job!`);
+    } else {
+      list.push(`You spent more than you earned this month. Try to cut back on expenses!`);
+    }
+    if (metrics.savChange > 0) {
+      list.push(`Your savings increased by ${metrics.savChange.toFixed(1)}% compared to last month.`);
+    }
+    if (metrics.spendingData.length > 0) {
+      const topCat = metrics.spendingData[0];
+      list.push(`Your highest expense this month is ${topCat.name} at ${formatInr(topCat.value)}.`);
+    }
+    if (list.length === 0) list.push("Welcome! Add some transactions to see AI insights here.");
+    return list;
+  }, [metrics]);
+
+  useEffect(() => {
+    if (insights.length === 0) return;
     const interval = setInterval(() => {
       setInsightIndex((prev) => (prev + 1) % insights.length);
     }, 6000);
     return () => clearInterval(interval);
-  }, []);
+  }, [insights]);
 
+  // Cash Flow Chart Data
   const getChartData = () => {
-    switch(timeframe) {
-      case 'Weekly': return cashFlowDataWeekly;
-      case 'Monthly': return cashFlowDataMonthly;
-      case 'Yearly': return cashFlowDataYearly;
+    // Generate simple aggregation for demo based on real data
+    const chartData = [];
+    if (timeframe === 'Monthly') {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      for (let i = 0; i < 12; i++) {
+        chartData.push({ name: months[i], income: 0, expense: 0, monthIdx: i });
+      }
+      const currentYear = new Date().getFullYear();
+      transactions.forEach(t => {
+        const d = new Date(t.date);
+        if (d.getFullYear() === currentYear) {
+          const amt = Number(t.amount);
+          if (t.type === 'income') chartData[d.getMonth()].income += amt;
+          if (t.type === 'expense') chartData[d.getMonth()].expense += amt;
+        }
+      });
+      return chartData.filter(d => d.income > 0 || d.expense > 0 || d.monthIdx <= new Date().getMonth());
+    } else if (timeframe === 'Yearly') {
+      const yearsMap: any = {};
+      transactions.forEach(t => {
+        const y = new Date(t.date).getFullYear().toString();
+        if(!yearsMap[y]) yearsMap[y] = { name: y, income: 0, expense: 0 };
+        if(t.type === 'income') yearsMap[y].income += Number(t.amount);
+        if(t.type === 'expense') yearsMap[y].expense += Number(t.amount);
+      });
+      return Object.values(yearsMap).sort((a: any, b: any) => a.name.localeCompare(b.name));
+    } else {
+      // Weekly - basic mock using last 7 days of real data
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      for(let i=6; i>=0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        chartData.push({ name: days[d.getDay()], income: 0, expense: 0, dateStr: d.toISOString().split('T')[0] });
+      }
+      transactions.forEach(t => {
+        const match = chartData.find(c => c.dateStr === t.date);
+        if (match) {
+          if (t.type === 'income') match.income += Number(t.amount);
+          if (t.type === 'expense') match.expense += Number(t.amount);
+        }
+      });
+      return chartData;
     }
   };
 
+  // Financial Health Score Calculation (Simplified logic)
+  const healthScore = useMemo(() => {
+    let score = 0;
+    // Savings Rate (30 points): Target > 20%
+    const savingsRate = metrics.currMonthInc > 0 ? (metrics.currMonthSavings / metrics.currMonthInc) : 0;
+    if (savingsRate >= 0.2) score += 30;
+    else if (savingsRate > 0) score += 15;
+
+    // Budget Discipline (20 points): Budgets not exceeded
+    if (budgets.length > 0) {
+      const withinLimits = budgets.filter(b => b.spent_amount <= b.limit_amount).length;
+      score += (withinLimits / budgets.length) * 20;
+    } else {
+      score += 10; // Neutral if no budgets
+    }
+
+    // Goal Progress (15 points): Average progress
+    if (goals.length > 0) {
+      const totalProgress = goals.reduce((acc, g) => acc + (g.target_amount > 0 ? g.saved_amount / g.target_amount : 0), 0);
+      score += Math.min((totalProgress / goals.length) * 15, 15);
+    } else {
+      score += 5; 
+    }
+
+    // Cash flow positive (20 points)
+    if (metrics.currMonthSavings > 0) score += 20;
+
+    // Base buffer
+    score += 15;
+
+    return Math.min(Math.round(score), 100);
+  }, [metrics, budgets, goals]);
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading Dashboard...</div>;
+  }
+
   return (
     <div className="space-y-8 pb-20 relative min-h-screen">
-      {/* Header section with Personalization and Search */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Good Morning, Anu 👋</h1>
-          <p className="text-slate-500">You have saved {formatInr(18200)} this month. Keep it up!</p>
+          <h1 className="text-2xl font-bold text-slate-900">Good Morning, {user?.user_metadata?.full_name?.split(' ')[0] || 'User'} 👋</h1>
+          <p className="text-slate-500">You have saved {formatInr(metrics.currMonthSavings > 0 ? metrics.currMonthSavings : 0)} this month. Keep it up!</p>
         </div>
-
       </div>
 
       {/* Top Summary Cards */}
       <motion.div 
         className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ staggerChildren: 0.1 }}
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ staggerChildren: 0.1 }}
       >
-        {/* Card 1: Total Balance */}
+        {/* Balance */}
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-500 mb-1">Available Balance</p>
-                <h4 className="text-3xl font-bold text-slate-900">{formatInr(245620)}</h4>
+                <h4 className="text-3xl font-bold text-slate-900">{formatInr(metrics.balance)}</h4>
               </div>
               <div className="w-12 h-12 rounded-full flex items-center justify-center bg-emerald-50 text-emerald-600">
                 <Wallet className="w-6 h-6" />
               </div>
             </div>
             <div className="mt-4 flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="flex items-center text-sm font-medium text-emerald-600">
-                  <ArrowUpRight className="w-4 h-4 mr-1" />
-                  12.5%
-                </span>
-                <span className="text-sm text-slate-500">from last month</span>
-              </div>
               <div className="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                <Clock className="w-3 h-3" /> Last Updated: Today • 10:42 AM
+                <Clock className="w-3 h-3" /> Live from Database
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 2: Monthly Income */}
+        {/* Monthly Income */}
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-500 mb-1">Monthly Income</p>
-                <h4 className="text-3xl font-bold text-slate-900">{formatInr(84500)}</h4>
+                <h4 className="text-3xl font-bold text-slate-900">{formatInr(metrics.currMonthInc)}</h4>
               </div>
               <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-50 text-blue-600">
                 <TrendingUp className="w-6 h-6" />
               </div>
             </div>
-            <div className="mt-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Income Sources</p>
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">Salary</span>
-                  <span className="font-medium text-slate-900">75%</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">Freelancing</span>
-                  <span className="font-medium text-slate-900">15%</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">Investments</span>
-                  <span className="font-medium text-slate-900">10%</span>
-                </div>
-              </div>
+            <div className="mt-4 flex items-center gap-2">
+              <span className={`flex items-center text-sm font-medium ${metrics.incChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {metrics.incChange >= 0 ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
+                {Math.abs(metrics.incChange).toFixed(1)}%
+              </span>
+              <span className="text-sm text-slate-500">vs last month</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 3: Monthly Expenses */}
+        {/* Monthly Expenses */}
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-500 mb-1">Monthly Expenses</p>
-                <h4 className="text-3xl font-bold text-slate-900">{formatInr(32400)}</h4>
+                <h4 className="text-3xl font-bold text-slate-900">{formatInr(metrics.currMonthExp)}</h4>
               </div>
               <div className="w-12 h-12 rounded-full flex items-center justify-center bg-red-50 text-red-600">
                 <CreditCard className="w-6 h-6" />
               </div>
             </div>
-            <div className="mt-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Top Spending</p>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded-md text-xs font-medium border border-amber-100">Food (38%)</span>
-                <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium border border-blue-100">Rent (37%)</span>
-                <span className="px-2 py-1 bg-pink-50 text-pink-700 rounded-md text-xs font-medium border border-pink-100">Shopping (14%)</span>
-              </div>
+            <div className="mt-4 flex items-center gap-2">
+              <span className={`flex items-center text-sm font-medium ${metrics.expChange <= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {metrics.expChange <= 0 ? <ArrowDownRight className="w-4 h-4 mr-1" /> : <ArrowUpRight className="w-4 h-4 mr-1" />}
+                {Math.abs(metrics.expChange).toFixed(1)}%
+              </span>
+              <span className="text-sm text-slate-500">vs last month</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 4: Total Savings */}
+        {/* Net Savings */}
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">Total Savings</p>
-                <h4 className="text-3xl font-bold text-slate-900">{formatInr(128500)}</h4>
+                <p className="text-sm font-medium text-slate-500 mb-1">Net Savings</p>
+                <h4 className="text-3xl font-bold text-slate-900">{formatInr(metrics.currMonthSavings)}</h4>
               </div>
               <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-50 text-purple-600">
                 <PiggyBank className="w-6 h-6" />
               </div>
             </div>
-            <div className="mt-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Goal Progress</p>
-              <div className="space-y-2">
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-600">Emergency Fund</span>
-                    <span className="text-slate-900 font-medium">60%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: '60%' }}></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-600">Laptop</span>
-                    <span className="text-slate-900 font-medium">47%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 rounded-full" style={{ width: '47%' }}></div>
-                  </div>
-                </div>
-              </div>
+            <div className="mt-4 flex items-center gap-2">
+              <span className={`flex items-center text-sm font-medium ${metrics.savChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {metrics.savChange >= 0 ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
+                {Math.abs(metrics.savChange).toFixed(1)}%
+              </span>
+              <span className="text-sm text-slate-500">vs last month</span>
             </div>
           </CardContent>
         </Card>
       </motion.div>
 
       {/* AI Insights Banner */}
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-6 border border-indigo-100/50 relative overflow-hidden"
-      >
-        <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
-          <Brain className="w-32 h-32 text-indigo-600" />
-        </div>
-        <div className="flex items-start gap-4 relative z-10">
-          <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5" />
+      {insights.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+          className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-6 border border-indigo-100/50 relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+            <Brain className="w-32 h-32 text-indigo-600" />
           </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-bold text-indigo-900 mb-1 flex items-center gap-2">
-              AI Financial Insight
-              <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-[10px] uppercase tracking-wider">New</span>
-            </h3>
-            <AnimatePresence mode="wait">
-              <motion.p 
-                key={insightIndex}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-                className="text-slate-700 font-medium leading-relaxed"
-              >
-                {insights[insightIndex]}
-              </motion.p>
-            </AnimatePresence>
+          <div className="flex items-start gap-4 relative z-10">
+            <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-bold text-indigo-900 mb-1 flex items-center gap-2">
+                AI Financial Insight
+                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-[10px] uppercase tracking-wider">Live</span>
+              </h3>
+              <AnimatePresence mode="wait">
+                <motion.p 
+                  key={insightIndex}
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}
+                  className="text-slate-700 font-medium leading-relaxed"
+                >
+                  {insights[insightIndex] || insights[0]}
+                </motion.p>
+              </AnimatePresence>
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Cash Flow Chart */}
@@ -308,8 +447,7 @@ export function Dashboard() {
             <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
               {['Weekly', 'Monthly', 'Yearly'].map((t) => (
                 <button 
-                  key={t}
-                  onClick={() => setTimeframe(t as any)}
+                  key={t} onClick={() => setTimeframe(t as any)}
                   className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${timeframe === t ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   {t}
@@ -342,7 +480,7 @@ export function Dashboard() {
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} width={60} tickFormatter={(value) => `₹${value/1000}k`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} width={60} tickFormatter={(value) => `₹${(value/1000).toFixed(0)}k`} />
                   <Tooltip content={<CustomTooltip />} />
                   <Area type="monotone" dataKey="income" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorIncomeChart)" />
                   <Area type="monotone" dataKey="expense" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorExpenseChart)" />
@@ -364,18 +502,20 @@ export function Dashboard() {
                   <circle cx="80" cy="80" r="72" stroke="#F1F5F9" strokeWidth="12" fill="none" />
                   <circle 
                     cx="80" cy="80" r="72" 
-                    stroke="#10B981" 
+                    stroke={healthScore >= 80 ? "#10B981" : healthScore >= 50 ? "#F59E0B" : "#EF4444"} 
                     strokeWidth="12" 
                     fill="none" 
                     strokeDasharray="452.39" 
-                    strokeDashoffset="81.43" // 82% score
+                    strokeDashoffset={452.39 - (452.39 * healthScore) / 100}
                     strokeLinecap="round" 
                     className="transition-all duration-1000 ease-out"
                   />
                 </svg>
                 <div className="absolute flex flex-col items-center">
-                  <span className="text-4xl font-bold text-slate-900">82</span>
-                  <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">Excellent</span>
+                  <span className="text-4xl font-bold text-slate-900">{healthScore}</span>
+                  <span className={`text-sm font-bold px-2 py-0.5 rounded-full mt-1 ${healthScore >= 80 ? 'text-emerald-600 bg-emerald-50' : healthScore >= 50 ? 'text-amber-600 bg-amber-50' : 'text-red-600 bg-red-50'}`}>
+                    {healthScore >= 80 ? 'Excellent' : healthScore >= 50 ? 'Fair' : 'Needs Imp.'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -384,25 +524,16 @@ export function Dashboard() {
               <h4 className="text-sm font-semibold text-slate-700 uppercase tracking-wider mb-2">Breakdown</h4>
               <div className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-lg transition-colors">
                 <span className="text-sm text-slate-600">Savings Rate</span>
-                <span className="text-sm font-medium text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Excellent</span>
+                {metrics.currMonthSavings > 0 ? (
+                  <span className="text-sm font-medium text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Good</span>
+                ) : (
+                  <span className="text-sm font-medium text-amber-600 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Low</span>
+                )}
               </div>
               <div className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-lg transition-colors">
                 <span className="text-sm text-slate-600">Expense Control</span>
-                <span className="text-sm font-medium text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Excellent</span>
+                <span className="text-sm font-medium text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Good</span>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-lg transition-colors">
-                <span className="text-sm text-slate-600">Emergency Fund</span>
-                <span className="text-sm font-medium text-amber-600 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Needs Imp.</span>
-              </div>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                <Brain className="w-4 h-4 text-indigo-500" /> AI Suggestion
-              </h4>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Boost your emergency fund by allocating 5% more of your income this month to achieve a "Secure" status faster.
-              </p>
             </div>
           </CardContent>
         </Card>
@@ -413,37 +544,39 @@ export function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100">
             <CardTitle>Recent Transactions</CardTitle>
-            <button className="text-sm font-medium text-primary hover:text-primary/80 transition-colors">View All</button>
+            <button onClick={() => navigate('/transactions')} className="text-sm font-medium text-primary hover:text-primary/80 transition-colors">View All</button>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y divide-slate-100">
-              {[
-                { name: 'Salary', icon: Briefcase, bg: 'bg-emerald-50', text: 'text-emerald-600', amount: 45000, type: 'income', date: 'Today', method: 'UPI' },
-                { name: 'Food & Dining', icon: Utensils, bg: 'bg-amber-50', text: 'text-amber-600', amount: -520, type: 'expense', date: 'Yesterday', method: 'Credit Card' },
-                { name: 'Amazon', icon: ShoppingCart, bg: 'bg-blue-50', text: 'text-blue-600', amount: -2150, type: 'expense', date: 'Today', method: 'Debit Card' },
-                { name: 'Uber', icon: Car, bg: 'bg-slate-100', text: 'text-slate-600', amount: -350, type: 'expense', date: 'Jul 15', method: 'UPI' },
-                { name: 'Electricity', icon: Zap, bg: 'bg-yellow-50', text: 'text-yellow-600', amount: -1450, type: 'expense', date: 'Jul 14', method: 'Net Banking' }
-              ].map((tx, i) => (
-                <div key={i} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.bg} ${tx.text}`}>
-                      <tx.icon className="w-5 h-5" />
+            <div className="divide-y divide-slate-100 max-h-[380px] overflow-y-auto">
+              {transactions.slice(0, 6).map((tx) => {
+                const styles = getCategoryStyles(tx.category);
+                return (
+                  <div key={tx.id} onClick={() => navigate('/transactions')} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${styles.bg} ${styles.text}`}>
+                        {React.createElement(styles.icon, { className: 'w-5 h-5' })}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{tx.merchant}</p>
+                        <p className="text-xs text-slate-500">{tx.date} • {tx.method}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-slate-900">{tx.name}</p>
-                      <p className="text-xs text-slate-500">{tx.date} • {tx.method}</p>
+                    <div className="text-right">
+                      <p className={`font-bold ${tx.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                        {tx.type === 'income' ? '+' : ''}{tx.type === 'expense' ? '-' : ''}{formatInr(tx.amount)}
+                      </p>
+                      <span className={`inline-block mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${tx.type === 'income' ? 'bg-emerald-50 text-emerald-700' : tx.type === 'refund' ? 'bg-slate-100 text-slate-700' : 'bg-red-50 text-red-700'}`}>
+                        {tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`font-bold ${tx.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
-                      {tx.type === 'income' ? '+' : ''}{formatInr(tx.amount)}
-                    </p>
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${tx.type === 'income' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                      {tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}
-                    </span>
-                  </div>
+                )
+              })}
+              {transactions.length === 0 && (
+                <div className="p-8 text-center text-slate-500 text-sm">
+                  No transactions found. Add your first transaction!
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
@@ -455,43 +588,46 @@ export function Dashboard() {
             <p className="text-sm text-slate-500 mt-1">This month's expenses by category</p>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px] w-full flex items-center justify-center relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={spendingData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={110}
-                    paddingAngle={2}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {spendingData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<PieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xs font-medium text-slate-500">Total</span>
-                <span className="text-xl font-bold text-slate-900">{formatInr(32400)}</span>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-              {spendingData.slice(0, 4).map((cat, i) => (
-                <div key={i} className="flex flex-col">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }}></div>
-                    {cat.name}
+            {metrics.spendingData.length > 0 ? (
+              <>
+                <div className="h-[280px] w-full flex items-center justify-center relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={metrics.spendingData}
+                        cx="50%" cy="50%"
+                        innerRadius={70} outerRadius={110}
+                        paddingAngle={2} dataKey="value" stroke="none"
+                      >
+                        {metrics.spendingData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<PieTooltip total={metrics.currMonthExp} />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-xs font-medium text-slate-500">Total</span>
+                    <span className="text-xl font-bold text-slate-900">{formatInr(metrics.currMonthExp)}</span>
                   </div>
-                  <span className="font-semibold text-slate-900 text-sm pl-4">{formatInr(cat.value)}</span>
                 </div>
-              ))}
-            </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                  {metrics.spendingData.slice(0, 4).map((cat, i) => (
+                    <div key={i} className="flex flex-col">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }}></div>
+                        {cat.name}
+                      </div>
+                      <span className="font-semibold text-slate-900 text-sm pl-4">{formatInr(cat.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-slate-500 text-sm">
+                No expenses recorded this month.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -503,30 +639,31 @@ export function Dashboard() {
             <CardTitle>Budget Progress</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {[
-              { name: 'Food', spent: 12500, limit: 15000, percent: 83, color: 'bg-amber-500' },
-              { name: 'Shopping', spent: 4500, limit: 11000, percent: 41, color: 'bg-pink-500' },
-              { name: 'Travel', spent: 2500, limit: 2700, percent: 92, color: 'bg-red-500' }, // Overspending warning
-              { name: 'Entertainment', spent: 3000, limit: 5000, percent: 60, color: 'bg-teal-500' },
-            ].map((budget, i) => (
-              <div key={i}>
-                <div className="flex justify-between text-sm mb-1.5">
-                  <span className="font-medium text-slate-700">{budget.name}</span>
-                  <span className="text-slate-500">{formatInr(budget.spent)} / {formatInr(budget.limit)}</span>
+            {budgets.length > 0 ? budgets.slice(0,4).map((budget) => {
+              const percent = (budget.spent_amount / budget.limit_amount) * 100;
+              const styles = getCategoryStyles(budget.category);
+              return (
+                <div key={budget.id}>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="font-medium text-slate-700">{budget.category}</span>
+                    <span className="text-slate-500">{formatInr(budget.spent_amount)} / {formatInr(budget.limit_amount)}</span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full ${percent > 90 ? 'bg-red-500' : ''}`} 
+                      style={{ width: `${Math.min(percent, 100)}%`, backgroundColor: percent <= 90 ? styles.color : undefined }}
+                    ></div>
+                  </div>
+                  {percent > 90 && (
+                    <p className="text-[10px] text-red-500 mt-1 font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Near limit
+                    </p>
+                  )}
                 </div>
-                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full ${budget.percent > 90 ? 'bg-red-500' : budget.color}`} 
-                    style={{ width: `${budget.percent}%` }}
-                  ></div>
-                </div>
-                {budget.percent > 90 && (
-                  <p className="text-[10px] text-red-500 mt-1 font-medium flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" /> Near limit
-                  </p>
-                )}
-              </div>
-            ))}
+              );
+            }) : (
+              <div className="text-center py-8 text-slate-500 text-sm">Create a budget to track spending limits.</div>
+            )}
           </CardContent>
         </Card>
 
@@ -536,33 +673,34 @@ export function Dashboard() {
             <CardTitle>Savings Goals</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              { name: 'Emergency Fund', icon: PiggyBank, target: 200000, saved: 120000, percent: 60, est: 'Nov 2026', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-              { name: 'Laptop', icon: Laptop, target: 90000, saved: 42000, percent: 47, est: 'Aug 2026', color: 'text-blue-600', bg: 'bg-blue-50' },
-              { name: 'Vacation', icon: Plane, target: 50000, saved: 18000, percent: 36, est: 'Jan 2027', color: 'text-purple-600', bg: 'bg-purple-50' },
-            ].map((goal, i) => (
-              <div key={i} className="p-3 border border-slate-100 rounded-xl hover:shadow-sm transition-shadow">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`p-2 rounded-lg ${goal.bg} ${goal.color}`}>
-                    <goal.icon className="w-4 h-4" />
+            {goals.length > 0 ? goals.slice(0,3).map((goal) => {
+              const percent = (goal.saved_amount / goal.target_amount) * 100;
+              return (
+                <div key={goal.id} className="p-3 border border-slate-100 rounded-xl hover:shadow-sm transition-shadow">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className={`p-2 rounded-lg bg-${goal.color_theme}-50 text-${goal.color_theme}-600`}>
+                      <Target className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="font-semibold text-slate-900 text-sm">{goal.name}</h5>
+                      {goal.target_date && <p className="text-xs text-slate-500">Target: {goal.target_date}</p>}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-slate-900">{percent.toFixed(0)}%</span>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h5 className="font-semibold text-slate-900 text-sm">{goal.name}</h5>
-                    <p className="text-xs text-slate-500">Est. {goal.est}</p>
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden mb-2">
+                    <div className="h-full rounded-full bg-slate-900" style={{ width: `${Math.min(percent, 100)}%` }}></div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-sm font-bold text-slate-900">{goal.percent}%</span>
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span>Saved: {formatInr(goal.saved_amount)}</span>
+                    <span>Target: {formatInr(goal.target_amount)}</span>
                   </div>
                 </div>
-                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden mb-2">
-                  <div className={`h-full rounded-full bg-slate-900`} style={{ width: `${goal.percent}%` }}></div>
-                </div>
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span>Saved: {formatInr(goal.saved)}</span>
-                  <span>Target: {formatInr(goal.target)}</span>
-                </div>
-              </div>
-            ))}
+              );
+            }) : (
+              <div className="text-center py-8 text-slate-500 text-sm">Add goals to visualize your savings progress.</div>
+            )}
           </CardContent>
         </Card>
 
@@ -573,23 +711,20 @@ export function Dashboard() {
               <CardTitle>Upcoming Bills</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {[
-                { name: 'Netflix', time: 'Tomorrow', amount: 649, urgent: true },
-                { name: 'Electricity', time: '3 Days', amount: 1450, urgent: true },
-                { name: 'Internet', time: '5 Days', amount: 999, urgent: false },
-                { name: 'Rent', time: '7 Days', amount: 12000, urgent: false },
-              ].map((bill, i) => (
-                <div key={i} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-50 hover:bg-slate-50 transition-colors">
+              {recurring.length > 0 ? recurring.map((bill) => (
+                <div key={bill.id} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-50 hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className={`w-2 h-8 rounded-full ${bill.urgent ? 'bg-red-500' : 'bg-slate-300'}`}></div>
+                    <div className={`w-2 h-8 rounded-full ${bill.is_urgent ? 'bg-red-500' : 'bg-slate-300'}`}></div>
                     <div>
                       <p className="font-medium text-sm text-slate-900">{bill.name}</p>
-                      <p className={`text-xs ${bill.urgent ? 'text-red-500 font-medium' : 'text-slate-500'}`}>{bill.time}</p>
+                      <p className={`text-xs ${bill.is_urgent ? 'text-red-500 font-medium' : 'text-slate-500'}`}>Due Date: {bill.due_date}</p>
                     </div>
                   </div>
                   <span className="font-semibold text-slate-900">{formatInr(bill.amount)}</span>
                 </div>
-              ))}
+              )) : (
+                <div className="text-center py-4 text-slate-500 text-sm">No recurring payments found.</div>
+              )}
             </CardContent>
           </Card>
 
@@ -602,22 +737,17 @@ export function Dashboard() {
               <div className="space-y-2 mb-4 relative z-10 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Income</span>
-                  <span className="font-semibold text-emerald-400">{formatInr(84500)}</span>
+                  <span className="font-semibold text-emerald-400">{formatInr(metrics.currMonthInc)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Expenses</span>
-                  <span className="font-semibold text-red-400">{formatInr(32400)}</span>
+                  <span className="font-semibold text-red-400">{formatInr(metrics.currMonthExp)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-slate-700">
                   <span className="text-slate-300">Net Savings</span>
-                  <span className="font-bold">{formatInr(52100)}</span>
+                  <span className="font-bold">{formatInr(metrics.currMonthSavings)}</span>
                 </div>
               </div>
-              <ul className="text-xs text-slate-300 space-y-1.5 relative z-10 list-disc pl-4">
-                <li>Savings increased by 11% compared to last month.</li>
-                <li>Food spending reduced by 8%.</li>
-                <li>Shopping increased by 15%.</li>
-              </ul>
             </CardContent>
           </Card>
         </div>
@@ -628,23 +758,17 @@ export function Dashboard() {
         <AnimatePresence>
           {showQuickActions && (
             <motion.div 
-              initial={{ opacity: 0, y: 20, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+              initial={{ opacity: 0, y: 20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.9 }}
               className="flex flex-col gap-2 mb-2"
             >
               {[
-                { label: 'Ask AI', icon: Brain, color: 'text-indigo-600', bg: 'bg-indigo-50' },
                 { label: 'Create Goal', icon: Target, color: 'text-purple-600', bg: 'bg-purple-50' },
                 { label: 'Create Budget', icon: Activity, color: 'text-orange-600', bg: 'bg-orange-50' },
-                { label: 'Transfer Money', icon: Send, color: 'text-blue-600', bg: 'bg-blue-50' },
-                { label: 'Add Expense', icon: Minus, color: 'text-red-600', bg: 'bg-red-50' },
-                { label: 'Add Income', icon: Plus, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                { label: 'Add Transaction', icon: Plus, color: 'text-emerald-600', bg: 'bg-emerald-50', action: () => navigate('/transactions') },
               ].map((action, i) => (
                 <motion.button 
-                  key={i}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  key={i} onClick={action.action}
+                  whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                   className="flex items-center gap-3 bg-white px-4 py-2 rounded-full shadow-lg border border-slate-100 hover:shadow-xl transition-all"
                 >
                   <span className="font-medium text-sm text-slate-700">{action.label}</span>

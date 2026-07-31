@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
@@ -8,6 +8,8 @@ import {
   X, Edit3, Image as ImageIcon, Monitor, RotateCcw
 } from 'lucide-react';
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from 'recharts';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 // Format currency in INR
 const formatInr = (amount: number) => {
@@ -19,16 +21,41 @@ const formatInr = (amount: number) => {
   }).format(amount);
 };
 
-// Initial Mock Data
-const initialTransactions = [
-  { id: 'TXN-1001', date: '2026-07-19', time: '14:30', category: 'Food', merchant: 'Swiggy', amount: 520, type: 'expense', method: 'UPI', status: 'Completed', notes: 'Lunch', tags: ['Personal'], icon: Utensils, iconBg: 'bg-amber-50', iconText: 'text-amber-600' },
-  { id: 'TXN-1002', date: '2026-07-18', time: '10:00', category: 'Salary', merchant: 'Tech Corp', amount: 85000, type: 'income', method: 'Net Banking', status: 'Completed', notes: 'July Salary', tags: ['Business'], icon: Briefcase, iconBg: 'bg-emerald-50', iconText: 'text-emerald-600' },
-  { id: 'TXN-1003', date: '2026-07-17', time: '18:45', category: 'Shopping', merchant: 'Amazon', amount: 2450, type: 'expense', method: 'Credit Card', status: 'Pending', notes: 'New headphones', tags: ['Personal'], icon: ShoppingCart, iconBg: 'bg-pink-50', iconText: 'text-pink-600' },
-  { id: 'TXN-1004', date: '2026-07-16', time: '09:15', category: 'Travel', merchant: 'Uber', amount: 350, type: 'expense', method: 'UPI', status: 'Completed', notes: 'Office commute', tags: ['Office'], icon: Car, iconBg: 'bg-blue-50', iconText: 'text-blue-600' },
-  { id: 'TXN-1005', date: '2026-07-15', time: '11:00', category: 'Bills', merchant: 'Electricity Board', amount: 1450, type: 'expense', method: 'Debit Card', status: 'Completed', notes: 'Monthly bill', tags: ['Family'], icon: Zap, iconBg: 'bg-yellow-50', iconText: 'text-yellow-600' },
-  { id: 'TXN-1006', date: '2026-07-14', time: '20:30', category: 'Entertainment', merchant: 'Netflix', amount: 649, type: 'expense', method: 'Credit Card', status: 'Completed', notes: 'Monthly subscription', tags: ['Personal'], icon: Monitor, iconBg: 'bg-purple-50', iconText: 'text-purple-600' },
-  { id: 'TXN-1007', date: '2026-07-12', time: '15:20', category: 'Refund', merchant: 'Myntra', amount: 1200, type: 'refund', method: 'UPI', status: 'Refunded', notes: 'Returned shirt', tags: ['Personal'], icon: RotateCcw, iconBg: 'bg-slate-100', iconText: 'text-slate-600' },
-];
+export interface Transaction {
+  id: string;
+  user_id: string;
+  date: string;
+  time: string;
+  category: string;
+  merchant: string;
+  amount: number;
+  type: string;
+  method: string;
+  status: string;
+  notes: string;
+  tags: string[];
+}
+
+const getCategoryStyles = (category: string) => {
+  const mapping: Record<string, any> = {
+    'Food': { icon: Utensils, iconBg: 'bg-amber-50', iconText: 'text-amber-600' },
+    'Salary': { icon: Briefcase, iconBg: 'bg-emerald-50', iconText: 'text-emerald-600' },
+    'Shopping': { icon: ShoppingCart, iconBg: 'bg-pink-50', iconText: 'text-pink-600' },
+    'Travel': { icon: Car, iconBg: 'bg-blue-50', iconText: 'text-blue-600' },
+    'Bills': { icon: Zap, iconBg: 'bg-yellow-50', iconText: 'text-yellow-600' },
+    'Entertainment': { icon: Monitor, iconBg: 'bg-purple-50', iconText: 'text-purple-600' },
+    'Refund': { icon: RotateCcw, iconBg: 'bg-slate-100', iconText: 'text-slate-600' },
+    'Freelancing': { icon: Briefcase, iconBg: 'bg-emerald-50', iconText: 'text-emerald-600' },
+    'Investment': { icon: ArrowUpRight, iconBg: 'bg-indigo-50', iconText: 'text-indigo-600' },
+    'Rent': { icon: FileText, iconBg: 'bg-orange-50', iconText: 'text-orange-600' },
+    'Healthcare': { icon: FileText, iconBg: 'bg-red-50', iconText: 'text-red-600' },
+    'Education': { icon: FileText, iconBg: 'bg-blue-50', iconText: 'text-blue-600' },
+    'Business': { icon: Briefcase, iconBg: 'bg-slate-50', iconText: 'text-slate-600' },
+    'Insurance': { icon: FileText, iconBg: 'bg-teal-50', iconText: 'text-teal-600' },
+    'Taxes': { icon: FileText, iconBg: 'bg-red-50', iconText: 'text-red-600' },
+  };
+  return mapping[category] || { icon: FileText, iconBg: 'bg-slate-100', iconText: 'text-slate-600' };
+};
 
 const analyticsData = [
   { name: '1 Jul', amount: 2400 },
@@ -43,14 +70,17 @@ const paymentMethods = ['Cash', 'UPI', 'Credit Card', 'Debit Card', 'Net Banking
 const types = ['Income', 'Expense', 'Transfer', 'Refund'];
 
 export function Transactions() {
-  const [transactions, setTransactions] = useState(initialTransactions);
+  const { user } = useAuth();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('All');
   const [selectedTxnIds, setSelectedTxnIds] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [viewTxn, setViewTxn] = useState<any>(null); // For detail view
+  const [editingTxnId, setEditingTxnId] = useState<string | null>(null);
   
   // New transaction form state
   const [newTxn, setNewTxn] = useState({
@@ -73,52 +103,128 @@ export function Transactions() {
     }
   };
 
+  const fetchTransactions = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .is('deleted_at', null)
+        .order('date', { ascending: false })
+        .order('time', { ascending: false });
+
+      if (error) throw error;
+      setTransactions(data || []);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchTransactions();
+
+    if (!user) return;
+    const subscription = supabase
+      .channel('transactions_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'transactions',
+        filter: `user_id=eq.${user.id}`
+      }, () => {
+        fetchTransactions();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [user, fetchTransactions]);
+
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
       const matchesSearch = 
         t.merchant.toLowerCase().includes(searchTerm.toLowerCase()) || 
         t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (t.notes && t.notes.toLowerCase().includes(searchTerm.toLowerCase())) ||
         t.id.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = selectedType === 'All' || t.type.toLowerCase() === selectedType.toLowerCase();
       return matchesSearch && matchesType;
     });
   }, [transactions, searchTerm, selectedType]);
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = async () => {
     if (window.confirm(`Are you sure you want to delete ${selectedTxnIds.length} transactions?`)) {
-      setTransactions(transactions.filter(t => !selectedTxnIds.includes(t.id)));
-      setSelectedTxnIds([]);
-      setViewTxn(null);
+      try {
+        const { error } = await supabase
+          .from('transactions')
+          .update({ deleted_at: new Date().toISOString() })
+          .in('id', selectedTxnIds);
+
+        if (error) throw error;
+        
+        setTransactions(transactions.filter(t => !selectedTxnIds.includes(t.id)));
+        setSelectedTxnIds([]);
+        setViewTxn(null);
+      } catch (error) {
+        console.error('Error deleting transactions:', error);
+        alert('Failed to delete transactions');
+      }
     }
   };
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const id = `TXN-${Math.floor(Math.random() * 10000) + 2000}`;
-    const tx = {
-      id,
-      date: newTxn.date || new Date().toISOString().split('T')[0],
-      time: newTxn.time || '12:00',
-      category: newTxn.category,
-      merchant: newTxn.merchant || 'Unknown',
-      amount: parseFloat(newTxn.amount) || 0,
-      type: newTxn.type.toLowerCase(),
-      method: newTxn.method,
-      status: 'Completed',
-      notes: newTxn.notes,
-      tags: newTxn.tags ? newTxn.tags.split(',').map(t => t.trim()) : [],
-      icon: FileText,
-      iconBg: 'bg-slate-100',
-      iconText: 'text-slate-600'
-    };
-    setTransactions([tx, ...transactions]);
-    setIsAddModalOpen(false);
-    setNewTxn({ type: 'Expense', amount: '', category: 'Food', method: 'UPI', merchant: '', date: '', time: '', notes: '', tags: '' });
+    if (!user) return;
+
+    try {
+      const txData = {
+        user_id: user.id,
+        date: newTxn.date || new Date().toISOString().split('T')[0],
+        time: newTxn.time || new Date().toLocaleTimeString('en-US', { hour12: false, hour: 'numeric', minute: 'numeric' }),
+        category: newTxn.category,
+        merchant: newTxn.merchant || 'Unknown',
+        amount: parseFloat(newTxn.amount) || 0,
+        type: newTxn.type.toLowerCase(),
+        method: newTxn.method,
+        status: 'Completed',
+        notes: newTxn.notes,
+        tags: newTxn.tags ? newTxn.tags.split(',').map(t => t.trim()) : [],
+      };
+
+      if (editingTxnId) {
+        const { error } = await supabase
+          .from('transactions')
+          .update(txData)
+          .eq('id', editingTxnId);
+        if (error) throw error;
+        setTransactions(transactions.map(t => t.id === editingTxnId ? { ...t, ...txData } as Transaction : t));
+        if (viewTxn?.id === editingTxnId) {
+          setViewTxn({ ...viewTxn, ...txData });
+        }
+      } else {
+        const { data, error } = await supabase
+          .from('transactions')
+          .insert([txData])
+          .select()
+          .single();
+        if (error) throw error;
+        setTransactions([data, ...transactions]);
+      }
+
+      setIsAddModalOpen(false);
+      setEditingTxnId(null);
+      setNewTxn({ type: 'Expense', amount: '', category: 'Food', method: 'UPI', merchant: '', date: '', time: '', notes: '', tags: '' });
+    } catch (error) {
+      console.error('Error saving transaction:', error);
+      alert('Failed to save transaction');
+    }
   };
 
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
+  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
   const netCashFlow = totalIncome - totalExpense;
 
   return (
@@ -253,8 +359,8 @@ export function Transactions() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.iconBg} ${tx.iconText}`}>
-                          {tx.icon && <tx.icon className="w-5 h-5" />}
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getCategoryStyles(tx.category).iconBg} ${getCategoryStyles(tx.category).iconText}`}>
+                          {React.createElement(getCategoryStyles(tx.category).icon, { className: 'w-5 h-5' })}
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900">{tx.merchant}</p>
@@ -319,8 +425,8 @@ export function Transactions() {
                   </CardHeader>
                   <CardContent className="pt-6 space-y-6">
                     <div className="text-center">
-                      <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-3 ${viewTxn.iconBg} ${viewTxn.iconText}`}>
-                        {viewTxn.icon && <viewTxn.icon className="w-8 h-8" />}
+                      <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-3 ${getCategoryStyles(viewTxn.category).iconBg} ${getCategoryStyles(viewTxn.category).iconText}`}>
+                        {React.createElement(getCategoryStyles(viewTxn.category).icon, { className: 'w-8 h-8' })}
                       </div>
                       <h3 className="text-2xl font-bold text-slate-900 mb-1">{formatInr(viewTxn.amount)}</h3>
                       <p className="text-sm font-medium text-slate-500">{viewTxn.merchant}</p>
@@ -360,13 +466,37 @@ export function Transactions() {
                     </div>
 
                     <div className="pt-4 flex gap-3">
-                      <button className="flex-1 bg-white border border-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center justify-center gap-2">
+                      <button onClick={() => {
+                        setNewTxn({
+                          type: viewTxn.type.charAt(0).toUpperCase() + viewTxn.type.slice(1),
+                          amount: viewTxn.amount.toString(),
+                          category: viewTxn.category,
+                          method: viewTxn.method,
+                          merchant: viewTxn.merchant,
+                          date: viewTxn.date,
+                          time: viewTxn.time,
+                          notes: viewTxn.notes || '',
+                          tags: viewTxn.tags ? viewTxn.tags.join(', ') : ''
+                        });
+                        setEditingTxnId(viewTxn.id);
+                        setIsAddModalOpen(true);
+                      }} className="flex-1 bg-white border border-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center justify-center gap-2">
                         <Edit3 className="w-4 h-4"/> Edit
                       </button>
-                      <button onClick={() => {
+                      <button onClick={async () => {
                         if(window.confirm('Delete this transaction?')) {
-                          setTransactions(transactions.filter(t => t.id !== viewTxn.id));
-                          setViewTxn(null);
+                          try {
+                            const { error } = await supabase
+                              .from('transactions')
+                              .update({ deleted_at: new Date().toISOString() })
+                              .eq('id', viewTxn.id);
+                            if (error) throw error;
+                            setTransactions(transactions.filter(t => t.id !== viewTxn.id));
+                            setViewTxn(null);
+                          } catch (error) {
+                            console.error('Error deleting transaction:', error);
+                            alert('Failed to delete transaction');
+                          }
                         }
                       }} className="flex-1 bg-red-50 text-red-600 py-2 rounded-lg text-sm font-medium hover:bg-red-100 flex items-center justify-center gap-2">
                         <Trash2 className="w-4 h-4"/> Delete
@@ -474,8 +604,8 @@ export function Transactions() {
               className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h2 className="text-lg font-bold text-slate-900">Add Transaction</h2>
-                <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+                <h2 className="text-lg font-bold text-slate-900">{editingTxnId ? 'Edit Transaction' : 'Add Transaction'}</h2>
+                <button onClick={() => { setIsAddModalOpen(false); setEditingTxnId(null); setNewTxn({ type: 'Expense', amount: '', category: 'Food', method: 'UPI', merchant: '', date: '', time: '', notes: '', tags: '' }); }} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
               </div>
               
               <div className="p-6 overflow-y-auto flex-1">
@@ -548,8 +678,8 @@ export function Transactions() {
               </div>
 
               <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 text-slate-700 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" form="add-txn-form" className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors">Save Transaction</button>
+                <button type="button" onClick={() => { setIsAddModalOpen(false); setEditingTxnId(null); setNewTxn({ type: 'Expense', amount: '', category: 'Food', method: 'UPI', merchant: '', date: '', time: '', notes: '', tags: '' }); }} className="px-4 py-2 text-slate-700 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+                <button type="submit" form="add-txn-form" className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors">{editingTxnId ? 'Update Transaction' : 'Save Transaction'}</button>
               </div>
             </motion.div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
@@ -8,6 +8,8 @@ import {
   Calendar, Sparkles, CheckCircle, ChevronRight, ChevronLeft, Building2, Dumbbell, Server
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 const formatInr = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {
@@ -18,115 +20,225 @@ const formatInr = (amount: number) => {
   }).format(amount);
 };
 
-// --- Mock Data ---
-const initialRecurring = [
-  { id: '1', name: 'Netflix', category: 'OTT Platforms', icon: Tv, amount: 649, frequency: 'Monthly', nextDue: '2026-07-20', status: 'Upcoming', autoDebit: true, method: 'UPI', color: '#EF4444' },
-  { id: '2', name: 'Spotify', category: 'Subscriptions', icon: Smartphone, amount: 119, frequency: 'Monthly', nextDue: '2026-07-25', status: 'Upcoming', autoDebit: true, method: 'Credit Card', color: '#10B981' },
-  { id: '3', name: 'Electricity Bill', category: 'Electricity', icon: Zap, amount: 2450, frequency: 'Monthly', nextDue: '2026-07-15', status: 'Paid', autoDebit: false, method: 'Net Banking', color: '#F59E0B' },
-  { id: '4', name: 'Amazon Prime', category: 'OTT Platforms', icon: Tv, amount: 1499, frequency: 'Yearly', nextDue: '2026-11-10', status: 'Upcoming', autoDebit: true, method: 'Credit Card', color: '#3B82F6' },
-  { id: '5', name: 'Gym Membership', category: 'Gym Membership', icon: Dumbbell, amount: 1200, frequency: 'Monthly', nextDue: '2026-08-01', status: 'Upcoming', autoDebit: true, method: 'UPI', color: '#8B5CF6' },
-  { id: '6', name: 'Apartment Rent', category: 'Rent', icon: Building2, amount: 18000, frequency: 'Monthly', nextDue: '2026-08-05', status: 'Upcoming', autoDebit: false, method: 'Net Banking', color: '#14B8A6' },
-];
+const getCategoryIcon = (category: string) => {
+  const mapping: Record<string, any> = {
+    'Subscriptions': Smartphone,
+    'OTT Platforms': Tv,
+    'Rent': Building2,
+    'Electricity': Zap,
+    'Water': Zap,
+    'Internet': Wifi,
+    'Mobile Recharge': Smartphone,
+    'Gas': Zap,
+    'Insurance': Shield,
+    'Loan EMI': Home,
+    'Home Loan': Home,
+    'Car Loan': Car,
+    'Education Loan': CheckCircle,
+    'Mutual Fund SIP': Activity,
+    'Stocks SIP': BarChart2,
+    'Gym Membership': Dumbbell,
+    'Cloud Storage': Server
+  };
+  return mapping[category] || CreditCard;
+};
 
-const initialEmis = [
-  { id: 'e1', name: 'Car Loan', emi: 12500, interest: '8.5%', remainingAmount: 450000, remainingMonths: 36, progress: 45, icon: Car },
-  { id: 'e2', name: 'Home Loan', emi: 35000, interest: '7.2%', remainingAmount: 3500000, remainingMonths: 100, progress: 30, icon: Home },
-];
-
-const initialSips = [
-  { id: 's1', name: 'Nifty 50 Index Fund', amount: 5000, nextDate: '2026-08-05', totalInvested: 150000, currentValue: 185000, icon: Activity },
-  { id: 's2', name: 'Small Cap Fund', amount: 2000, nextDate: '2026-08-10', totalInvested: 48000, currentValue: 62000, icon: BarChart2 },
-];
-
-const initialInsurances = [
-  { id: 'i1', name: 'Health Insurance', premium: 18000, nextDate: '2026-12-01', provider: 'HDFC Ergo', icon: Shield },
-  { id: 'i2', name: 'Term Life Insurance', premium: 12000, nextDate: '2027-01-15', provider: 'ICICI Prudential', icon: Shield },
-];
-
-const paymentHistory = [
-  { id: 'h1', date: '2026-07-15', name: 'Electricity Bill', amount: 2450, method: 'Net Banking', status: 'Paid', ref: 'UPI/3196238491/Elect' },
-  { id: 'h2', date: '2026-07-05', name: 'Apartment Rent', amount: 18000, method: 'Net Banking', status: 'Paid', ref: 'IMPS/318529384/Rent' },
-  { id: 'h3', date: '2026-07-01', name: 'Gym Membership', amount: 1200, method: 'UPI', status: 'Paid', ref: 'UPI/318229384/Gym' },
-  { id: 'h4', date: '2026-06-25', name: 'Spotify', amount: 119, method: 'Credit Card', status: 'Paid', ref: 'CC/AUTH/847293' },
-  { id: 'h5', date: '2026-06-20', name: 'Netflix', amount: 649, method: 'UPI', status: 'Paid', ref: 'UPI/317529384/Netfl' },
-];
-
-const autoDetectTransactions = [
-  { id: 'ad1', name: 'Jio Fiber', category: 'Internet', icon: Wifi, amount: 999, frequency: 'Monthly', lastPaid: '2026-07-03' },
-  { id: 'ad2', name: 'Google One', category: 'Cloud Storage', icon: Server, amount: 1300, frequency: 'Yearly', lastPaid: '2025-08-14' },
-];
-
-const expenseTrendData = [
-  { month: 'Jan', amount: 31500 },
-  { month: 'Feb', amount: 32000 },
-  { month: 'Mar', amount: 31800 },
-  { month: 'Apr', amount: 34500 },
-  { month: 'May', amount: 35000 },
-  { month: 'Jun', amount: 34800 },
-  { month: 'Jul', amount: 35200 },
-];
-
-const monthlyExpenseBarData = [
-  { name: 'Rent', amount: 18000 },
-  { name: 'EMI', amount: 47500 },
-  { name: 'SIP', amount: 7000 },
-  { name: 'Bills', amount: 3449 },
-];
-
-const allCategories = ['Subscriptions', 'Rent', 'Electricity', 'Water', 'Internet', 'Mobile Recharge', 'Gas', 'Insurance', 'Loan EMI', 'Home Loan', 'Car Loan', 'Education Loan', 'Mutual Fund SIP', 'Stocks SIP', 'Gym Membership', 'OTT Platforms', 'Cloud Storage', 'Software Licenses', 'Medical', 'Education', 'Others'];
+const allCategories = ['Subscriptions', 'Rent', 'Electricity', 'Water', 'Internet', 'Mobile Recharge', 'Gas', 'Insurance', 'Loan EMI', 'Home Loan', 'Car Loan', 'Education Loan', 'Mutual Fund SIP', 'Stocks SIP', 'Gym Membership', 'OTT Platforms', 'Cloud Storage', 'Medical', 'Education', 'Others'];
 const frequencies = ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly', 'Custom'];
 const presetColors = ['#EF4444', '#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#14B8A6', '#EC4899', '#6366F1', '#06B6D4', '#F43F5E'];
 
 export function RecurringPayments() {
-  const [payments, setPayments] = useState(initialRecurring);
+  const { user } = useAuth();
+  const [payments, setPayments] = useState<any[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'All' | 'Bills' | 'EMI' | 'SIP' | 'Insurance' | 'Calendar' | 'History'>('All');
-  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 6)); // July 2026
+  const [activeTab, setActiveTab] = useState<'All' | 'Subscriptions' | 'Bills' | 'EMI' | 'SIP' | 'Insurance' | 'Calendar' | 'History'>('All');
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   
   // Form State
   const [formData, setFormData] = useState({
-    name: '', category: 'Subscriptions', amount: '', frequency: 'Monthly', nextDue: '', method: 'UPI', autoDebit: true, reminder: '3 Days Before', color: '#3B82F6', notes: ''
+    name: '', category: 'Subscriptions', amount: '', frequency: 'Monthly', nextDue: '', method: 'UPI', merchant: '', autoDebit: true, reminder: '3', color: '#3B82F6', notes: ''
   });
 
-  const monthlyCost = payments.filter(p => p.frequency === 'Monthly').reduce((acc, curr) => acc + curr.amount, 0) + 
-                      initialEmis.reduce((acc, curr) => acc + curr.emi, 0) +
-                      initialSips.reduce((acc, curr) => acc + curr.amount, 0);
-                      
-  const annualCost = (monthlyCost * 12) + payments.filter(p => p.frequency === 'Yearly').reduce((acc, curr) => acc + curr.amount, 0) + initialInsurances.reduce((acc, curr) => acc + curr.premium, 0);
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const [payRes, txRes] = await Promise.all([
+        supabase.from('recurring_payments').select('*').order('next_due_date', { ascending: true }),
+        supabase.from('transactions').select('*').in('category', ['Subscription', 'Bill Payment', 'EMI', 'SIP', 'Insurance Premium', 'Recurring']).order('date', { ascending: false }).limit(50)
+      ]);
+
+      if (payRes.data) {
+        setPayments(payRes.data);
+      }
+      if (txRes.data) {
+        setPaymentHistory(txRes.data);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchData();
+
+    if (!user) return;
+    const paySub = supabase.channel('recurring_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'recurring_payments', filter: `user_id=eq.${user.id}` }, fetchData).subscribe();
+    const txSub = supabase.channel('tx_recurring_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${user.id}` }, fetchData).subscribe();
+
+    return () => {
+      supabase.removeChannel(paySub);
+      supabase.removeChannel(txSub);
+    };
+  }, [user, fetchData]);
+
+  // Derived Live Data
+  const livePayments = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return payments.map(p => {
+      let liveStatus = 'Upcoming';
+      if (p.status === 'Paused') {
+        liveStatus = 'Paused';
+      } else if (p.next_due_date < today) {
+        liveStatus = 'Overdue';
+      } else if (p.next_due_date === today) {
+        liveStatus = 'Due Today';
+      }
+      return { ...p, liveStatus };
+    });
+  }, [payments]);
+
+  // Cost Projections
+  const calculateAnnualCost = (amount: number, freq: string) => {
+    switch (freq) {
+      case 'Daily': return amount * 365;
+      case 'Weekly': return amount * 52;
+      case 'Monthly': return amount * 12;
+      case 'Quarterly': return amount * 4;
+      case 'Half-Yearly': return amount * 2;
+      case 'Yearly': return amount;
+      default: return amount * 12;
+    }
+  };
+
+  const monthlyCost = livePayments.filter(p => p.liveStatus !== 'Paused').reduce((acc, curr) => acc + (calculateAnnualCost(Number(curr.amount), curr.frequency) / 12), 0);
+  const annualCost = monthlyCost * 12;
+  const activeCount = livePayments.filter(p => p.liveStatus !== 'Paused').length;
+  
+  // Next 7 days logic
+  const todayObj = new Date();
+  const next7DaysObj = new Date();
+  next7DaysObj.setDate(next7DaysObj.getDate() + 7);
+  const upcoming7DaysCount = livePayments.filter(p => {
+    if (!p.next_due_date || p.liveStatus === 'Paused') return false;
+    const due = new Date(p.next_due_date);
+    return due >= todayObj && due <= next7DaysObj;
+  }).length;
 
   const categoryDistribution = Object.entries(
-    payments.reduce((acc, curr) => {
-      const annual = curr.frequency === 'Monthly' ? curr.amount * 12 : curr.frequency === 'Yearly' ? curr.amount : curr.amount * 4;
-      acc[curr.category] = (acc[curr.category] || 0) + annual;
+    livePayments.reduce((acc, curr) => {
+      if (curr.liveStatus === 'Paused') return acc;
+      const annual = calculateAnnualCost(Number(curr.amount), curr.frequency);
+      acc[curr.category || 'Other'] = (acc[curr.category || 'Other'] || 0) + annual;
       return acc;
     }, {} as Record<string, number>)
   ).map(([name, value], idx) => ({ name, value, color: presetColors[idx % presetColors.length] }));
 
-  const handleSave = (e: React.FormEvent) => {
+  // Handlers
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingPayment) {
-      setPayments(payments.map(p => p.id === editingPayment.id ? { 
-        ...p, ...formData, amount: Number(formData.amount) 
-      } : p));
-    } else {
-      const newP = {
-        id: Math.random().toString(),
-        icon: CreditCard, 
-        status: 'Upcoming',
-        ...formData,
-        amount: Number(formData.amount)
+    if (!user) return;
+    try {
+      const payload = {
+        user_id: user.id,
+        name: formData.name,
+        category: formData.category,
+        amount: Number(formData.amount),
+        frequency: formData.frequency,
+        next_due_date: formData.nextDue || null,
+        payment_method: formData.method,
+        merchant: formData.merchant,
+        auto_pay: formData.autoDebit,
+        reminder_days: Number(formData.reminder),
+        color_theme: formData.color,
+        notes: formData.notes
       };
-      setPayments([...payments, newP]);
+
+      if (editingPayment) {
+        await supabase.from('recurring_payments').update(payload).eq('id', editingPayment.id);
+      } else {
+        await supabase.from('recurring_payments').insert({...payload, status: 'Active'});
+      }
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error(err);
     }
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to permanently delete this recurring payment?")) {
-      setPayments(payments.filter(p => p.id !== id));
+      await supabase.from('recurring_payments').delete().eq('id', id);
+    }
+  };
+
+  const togglePause = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'Paused' ? 'Active' : 'Paused';
+    await supabase.from('recurring_payments').update({ status: newStatus }).eq('id', id);
+  };
+
+  const rollDateForward = (dateStr: string, frequency: string) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    switch (frequency) {
+      case 'Daily': d.setDate(d.getDate() + 1); break;
+      case 'Weekly': d.setDate(d.getDate() + 7); break;
+      case 'Monthly': d.setMonth(d.getMonth() + 1); break;
+      case 'Quarterly': d.setMonth(d.getMonth() + 3); break;
+      case 'Half-Yearly': d.setMonth(d.getMonth() + 6); break;
+      case 'Yearly': d.setFullYear(d.getFullYear() + 1); break;
+      default: d.setMonth(d.getMonth() + 1);
+    }
+    return d.toISOString().split('T')[0];
+  };
+
+  const markAsPaid = async (p: any) => {
+    if (!user) return;
+    try {
+      // 1. Roll over date
+      const newDate = rollDateForward(p.next_due_date, p.frequency);
+      
+      // 2. Insert transaction
+      const today = new Date().toISOString().split('T')[0];
+      
+      let txCategory = 'Recurring';
+      if (p.category.includes('SIP')) txCategory = 'SIP';
+      else if (p.category.includes('EMI')) txCategory = 'EMI';
+      else if (p.category.includes('Insurance')) txCategory = 'Insurance Premium';
+      else if (p.category.includes('Subscription') || p.category.includes('OTT')) txCategory = 'Subscription';
+      else txCategory = 'Bill Payment';
+
+      await Promise.all([
+        supabase.from('recurring_payments').update({ next_due_date: newDate }).eq('id', p.id),
+        supabase.from('transactions').insert({
+          user_id: user.id,
+          amount: p.amount,
+          date: today,
+          type: 'expense',
+          category: txCategory,
+          payee: p.merchant || p.name,
+          payment_method: p.payment_method || 'Net Banking',
+          notes: `Auto-generated from Recurring Payments`
+        })
+      ]);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -135,31 +247,74 @@ export function RecurringPayments() {
       setEditingPayment(payment);
       setFormData({ 
         name: payment.name, category: payment.category, amount: payment.amount.toString(), 
-        frequency: payment.frequency, nextDue: payment.nextDue, method: payment.method, 
-        autoDebit: payment.autoDebit, reminder: payment.reminder || '3 Days Before', color: payment.color || '#3B82F6', notes: payment.notes || ''
+        frequency: payment.frequency, nextDue: payment.next_due_date, method: payment.payment_method, 
+        merchant: payment.merchant || '', autoDebit: payment.auto_pay, reminder: payment.reminder_days?.toString() || '3', 
+        color: payment.color_theme || '#3B82F6', notes: payment.notes || ''
       });
     } else {
       setEditingPayment(null);
-      setFormData({ name: '', category: predefinedCategory || 'Subscriptions', amount: '', frequency: 'Monthly', nextDue: '', method: 'UPI', autoDebit: true, reminder: '3 Days Before', color: '#3B82F6', notes: '' });
+      setFormData({ name: '', category: predefinedCategory || 'Subscriptions', amount: '', frequency: 'Monthly', nextDue: '', method: 'UPI', merchant: '', autoDebit: true, reminder: '3', color: '#3B82F6', notes: '' });
     }
     setIsModalOpen(true);
   };
 
-  const renderStatusBadge = (status: string) => {
-    switch(status) {
+  const renderStatusBadge = (liveStatus: string) => {
+    switch(liveStatus) {
       case 'Upcoming': return <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center gap-1"><Clock className="w-3 h-3"/> Upcoming</span>;
-      case 'Paid': return <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Paid</span>;
+      case 'Due Today': return <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Due Today</span>;
       case 'Overdue': return <span className="px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Overdue</span>;
-      case 'Cancelled': return <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1"><X className="w-3 h-3"/> Cancelled</span>;
+      case 'Paused': return <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1"><X className="w-3 h-3"/> Paused</span>;
       default: return null;
     }
   };
+
+  // Filter Logic
+  const filteredPayments = livePayments.filter(p => {
+    if (activeTab === 'All') return true;
+    if (activeTab === 'Subscriptions') return p.category === 'Subscriptions' || p.category === 'OTT Platforms' || p.category === 'Gym Membership' || p.category === 'Cloud Storage';
+    if (activeTab === 'Bills') return p.category === 'Electricity' || p.category === 'Water' || p.category === 'Gas' || p.category === 'Internet' || p.category === 'Mobile Recharge' || p.category === 'Rent';
+    if (activeTab === 'EMI') return p.category.includes('Loan') || p.category === 'Loan EMI';
+    if (activeTab === 'SIP') return p.category.includes('SIP');
+    if (activeTab === 'Insurance') return p.category.includes('Insurance');
+    return true;
+  });
+
+  // AI Insights Generation
+  const insights = useMemo(() => {
+    const alerts = [];
+    const subsCost = livePayments.filter(p => p.category === 'Subscriptions' || p.category === 'OTT Platforms').reduce((acc, curr) => acc + (calculateAnnualCost(Number(curr.amount), curr.frequency)), 0);
+    
+    if (subsCost > 15000) {
+      alerts.push(`You spend ${formatInr(subsCost)} every year on subscriptions. Cancelling just 1 or 2 could save you thousands!`);
+    }
+
+    const overdues = livePayments.filter(p => p.liveStatus === 'Overdue');
+    if (overdues.length > 0) {
+      alerts.push(`Warning: You have ${overdues.length} overdue payment(s) (${overdues.map(o => o.name).join(', ')}). Pay them to avoid penalties.`);
+    }
+
+    if (activeCount === 0 && livePayments.length > 0) {
+      alerts.push(`All your payments are paused. Remember to resume them when necessary.`);
+    }
+    
+    if (livePayments.length === 0) {
+      alerts.push(`Start automating your financial life by adding your first recurring bill or subscription!`);
+    } else if (alerts.length === 0) {
+      alerts.push(`Great job! All your automated payments are on track. Your Financial Health is solid.`);
+    }
+
+    return alerts;
+  }, [livePayments, activeCount]);
 
   // Generate days for Calendar View
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const blanks = Array.from({ length: firstDayOfMonth }, (_, i) => i);
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading Recurring Payments...</div>;
+  }
 
   return (
     <div className="space-y-6 pb-20 relative min-h-screen">
@@ -187,15 +342,12 @@ export function RecurringPayments() {
           <CardContent className="p-5">
             <p className="text-sm font-medium text-slate-500 mb-1">Monthly Recurring Cost</p>
             <h4 className="text-2xl font-bold text-slate-900">{formatInr(monthlyCost)}</h4>
-            <div className="mt-2 flex items-center text-sm font-medium text-slate-500">
-              <span className="text-red-600 flex items-center mr-1"><ArrowUpRight className="w-4 h-4"/> 4%</span> vs last month
-            </div>
           </CardContent>
         </Card>
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-5">
             <p className="text-sm font-medium text-slate-500 mb-1">Upcoming Payments</p>
-            <h4 className="text-2xl font-bold text-slate-900">4</h4>
+            <h4 className="text-2xl font-bold text-slate-900">{upcoming7DaysCount}</h4>
             <div className="mt-2 flex items-center text-sm font-medium text-slate-500">
               <span className="text-slate-600 flex items-center mr-1"><Clock className="w-4 h-4"/> Next 7 days</span>
             </div>
@@ -203,16 +355,13 @@ export function RecurringPayments() {
         </Card>
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-5">
-            <p className="text-sm font-medium text-slate-500 mb-1">Active Subscriptions</p>
-            <h4 className="text-2xl font-bold text-slate-900">6</h4>
-            <div className="mt-2 flex items-center text-sm font-medium text-slate-500">
-              <span className="text-emerald-600 flex items-center mr-1"><ArrowDownRight className="w-4 h-4"/> 1</span> cancelled recently
-            </div>
+            <p className="text-sm font-medium text-slate-500 mb-1">Active Payments</p>
+            <h4 className="text-2xl font-bold text-slate-900">{activeCount}</h4>
           </CardContent>
         </Card>
         <Card className="hover:shadow-md transition-shadow bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none">
           <CardContent className="p-5">
-            <p className="text-sm font-medium text-slate-300 mb-1">Annual Subscription Cost</p>
+            <p className="text-sm font-medium text-slate-300 mb-1">Annual Projected Cost</p>
             <h4 className="text-2xl font-bold text-white">{formatInr(annualCost)}</h4>
             <div className="mt-2 flex items-center text-sm font-medium text-slate-300">
               <span className="text-emerald-400 flex items-center mr-1"><Shield className="w-4 h-4"/></span> Tracked & Optimized
@@ -226,7 +375,7 @@ export function RecurringPayments() {
         <div className="xl:col-span-2 space-y-6">
           
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            {['All', 'Bills', 'EMI', 'SIP', 'Insurance', 'Calendar', 'History'].map(tab => (
+            {['All', 'Subscriptions', 'Bills', 'EMI', 'SIP', 'Insurance', 'Calendar', 'History'].map(tab => (
               <button 
                 key={tab} onClick={() => setActiveTab(tab as any)}
                 className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === tab ? 'bg-primary text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}
@@ -236,157 +385,78 @@ export function RecurringPayments() {
             ))}
           </div>
 
-          {(activeTab === 'All' || activeTab === 'Bills') && (
+          {(activeTab !== 'Calendar' && activeTab !== 'History') && (
             <Card>
               <CardHeader className="border-b border-slate-100 pb-4 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">Bills & Subscriptions</CardTitle>
+                <CardTitle className="text-lg">{activeTab === 'All' ? 'All Recurring Payments' : activeTab}</CardTitle>
                 <div className="flex gap-2">
-                  <button onClick={() => openModal(null, 'Subscriptions')} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-md transition-colors"><Plus className="w-4 h-4" /></button>
+                  <button onClick={() => openModal()} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-md transition-colors"><Plus className="w-4 h-4" /></button>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y divide-slate-100">
-                  {payments.map(p => (
-                    <div key={p.id} className="p-5 hover:bg-slate-50 transition-colors group">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-100 shadow-sm" style={{ color: p.color }}>
-                            <p.icon className="w-6 h-6" />
+                  {filteredPayments.length > 0 ? filteredPayments.map(p => {
+                    const Icon = getCategoryIcon(p.category);
+                    const annualProj = calculateAnnualCost(Number(p.amount), p.frequency);
+                    
+                    return (
+                      <div key={p.id} className={`p-5 hover:bg-slate-50 transition-colors group relative ${p.liveStatus === 'Paused' ? 'opacity-50' : ''}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-100 shadow-sm" style={{ color: p.color_theme || '#3B82F6' }}>
+                              <Icon className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-slate-900">{p.name}</h4>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs font-medium text-slate-500">
+                                <span className="flex items-center gap-1"><RefreshCw className="w-3 h-3"/> {p.frequency}</span>
+                                <span className="flex items-center gap-1"><CreditCard className="w-3 h-3"/> {p.payment_method || 'Other'}</span>
+                                {p.auto_pay && <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-1"><Zap className="w-3 h-3"/>Auto Debit</span>}
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="font-bold text-slate-900">{p.name}</h4>
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs font-medium text-slate-500">
-                              <span className="flex items-center gap-1"><RefreshCw className="w-3 h-3"/> {p.frequency}</span>
-                              <span className="flex items-center gap-1"><CreditCard className="w-3 h-3"/> {p.method}</span>
-                              {p.autoDebit && <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded flex items-center gap-1"><Zap className="w-3 h-3"/>Auto Debit</span>}
+                          <div className="flex items-center gap-6">
+                            <div className="text-right hidden sm:block">
+                              <p className="text-sm font-medium text-slate-500 mb-1">Next Due: {p.next_due_date ? new Date(p.next_due_date).toLocaleDateString() : 'N/A'}</p>
+                              {renderStatusBadge(p.liveStatus)}
+                            </div>
+                            <div className="text-right group/impact cursor-help relative">
+                              <h4 className="font-bold text-lg text-slate-900">{formatInr(p.amount)}</h4>
+                              <p className="text-[10px] text-slate-400 border-b border-dashed border-slate-300">View Impact</p>
+                              
+                              {/* Lifetime Cost Hover Tooltip */}
+                              <div className="absolute top-full right-0 mt-2 w-48 bg-slate-800 text-white p-3 rounded-lg opacity-0 invisible group-hover/impact:opacity-100 group-hover/impact:visible transition-all z-20 shadow-xl">
+                                <p className="text-[10px] uppercase font-bold text-slate-400 mb-2 border-b border-slate-700 pb-1">Cost Projection</p>
+                                <div className="space-y-1 text-xs font-medium">
+                                  <div className="flex justify-between"><span className="text-slate-300">Yearly</span><span>{formatInr(annualProj)}</span></div>
+                                  <div className="flex justify-between"><span className="text-slate-300">5-Years</span><span>{formatInr(annualProj * 5)}</span></div>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-6">
-                          <div className="text-right hidden sm:block">
-                            <p className="text-sm font-medium text-slate-500 mb-1">Next Due: {p.nextDue}</p>
-                            {renderStatusBadge(p.status)}
-                          </div>
-                          <div className="text-right">
-                            <h4 className="font-bold text-lg text-slate-900">{formatInr(p.amount)}</h4>
-                            <div className="flex items-center justify-end gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => openModal(p)} className="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50 rounded-md"><Edit3 className="w-4 h-4"/></button>
-                              <button onClick={() => handleDelete(p.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md"><Trash2 className="w-4 h-4"/></button>
-                            </div>
-                          </div>
+                        
+                        {/* Hidden action bar revealed on hover */}
+                        <div className="absolute bottom-2 right-5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white shadow-sm border border-slate-100 rounded-lg p-1">
+                          <button onClick={() => markAsPaid(p)} className="px-2 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded text-xs font-bold transition-colors flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3"/> Mark Paid
+                          </button>
+                          <button onClick={() => togglePause(p.id, p.status)} className="px-2 py-1 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded text-xs font-bold transition-colors">
+                            {p.status === 'Paused' ? 'Resume' : 'Pause'}
+                          </button>
+                          <button onClick={() => openModal(p)} className="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50 rounded"><Edit3 className="w-3.5 h-3.5"/></button>
+                          <button onClick={() => handleDelete(p.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5"/></button>
                         </div>
                       </div>
+                    );
+                  }) : (
+                    <div className="p-10 text-center flex flex-col items-center">
+                      <RefreshCw className="w-10 h-10 text-slate-300 mb-3" />
+                      <h4 className="font-bold text-slate-900 mb-1">No Payments Found</h4>
+                      <p className="text-sm text-slate-500 mb-4">Add your first recurring payment to automate bill tracking.</p>
+                      <button onClick={() => openModal()} className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors">Add Payment</button>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {(activeTab === 'All' || activeTab === 'EMI') && (
-            <Card>
-              <CardHeader className="border-b border-slate-100 pb-4 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">Loan EMIs</CardTitle>
-                <button onClick={() => openModal(null, 'Loan EMI')} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-md transition-colors"><Plus className="w-4 h-4" /></button>
-              </CardHeader>
-              <CardContent className="p-5 space-y-5">
-                {initialEmis.map(e => (
-                  <div key={e.id} className="border border-slate-200 rounded-xl p-5 hover:border-slate-300 transition-colors shadow-sm">
-                    <div className="flex justify-between items-start mb-5">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                          <e.icon className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900">{e.name}</h4>
-                          <p className="text-sm font-medium text-slate-500">{e.interest} Interest Rate</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <h4 className="font-bold text-lg text-slate-900">{formatInr(e.emi)}<span className="text-sm text-slate-500 font-normal">/mo</span></h4>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm font-bold text-slate-700 mb-2">
-                        <span>Paid: {e.progress}%</span>
-                        <span>{e.remainingMonths} Months Left</span>
-                      </div>
-                      <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{width: `${e.progress}%`}}></div>
-                      </div>
-                      <div className="flex justify-between mt-2">
-                        <p className="text-xs text-slate-500">Remaining: {formatInr(e.remainingAmount)}</p>
-                        <p className="text-xs text-emerald-600 font-medium">Auto Debit Active</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {(activeTab === 'All' || activeTab === 'SIP') && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {initialSips.map(s => (
-                <Card key={s.id} className="border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
-                  <CardContent className="p-5">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
-                        <s.icon className="w-6 h-6" />
-                      </div>
-                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">SIP</span>
-                    </div>
-                    <h4 className="font-bold text-slate-900 mb-1">{s.name}</h4>
-                    <p className="text-2xl font-bold text-slate-900 mb-5">{formatInr(s.amount)}<span className="text-sm text-slate-500 font-normal">/mo</span></p>
-                    <div className="space-y-3 border-t border-slate-100 pt-4">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Total Invested</span>
-                        <span className="font-semibold text-slate-700">{formatInr(s.totalInvested)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Current Value</span>
-                        <span className="font-bold text-emerald-600">{formatInr(s.currentValue)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs mt-2 pt-2 border-t border-slate-50">
-                        <span className="text-slate-400">Next Due: {s.nextDate}</span>
-                        <span className="text-blue-600 font-medium flex items-center gap-1">View Goal <ArrowUpRight className="w-3 h-3"/></span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              <div onClick={() => openModal(null, 'Mutual Fund SIP')} className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-500 hover:text-primary hover:border-primary hover:bg-primary/5 transition-all cursor-pointer min-h-[200px]">
-                <Plus className="w-8 h-8 mb-2" />
-                <span className="font-medium">Add New SIP</span>
-              </div>
-            </div>
-          )}
-
-          {(activeTab === 'All' || activeTab === 'Insurance') && (
-            <Card>
-               <CardHeader className="border-b border-slate-100 pb-4 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">Insurance Premiums</CardTitle>
-                <button onClick={() => openModal(null, 'Insurance')} className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-md transition-colors"><Plus className="w-4 h-4" /></button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-slate-100">
-                  {initialInsurances.map((ins) => (
-                    <div key={ins.id} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                          <ins.icon className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900">{ins.name}</h4>
-                          <p className="text-sm font-medium text-slate-500">{ins.provider} • Yearly</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <h4 className="font-bold text-lg text-slate-900">{formatInr(ins.premium)}</h4>
-                        <p className="text-xs font-medium text-slate-500 mt-1">Renews {ins.nextDate}</p>
-                      </div>
-                    </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -400,7 +470,7 @@ export function RecurringPayments() {
                   <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} className="p-1 hover:bg-slate-100 rounded">
                     <ChevronLeft className="w-5 h-5 text-slate-600" />
                   </button>
-                  <span className="font-bold text-slate-900 min-w-[100px] text-center">
+                  <span className="font-bold text-slate-900 min-w-[140px] text-center">
                     {currentMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}
                   </span>
                   <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} className="p-1 hover:bg-slate-100 rounded">
@@ -417,20 +487,23 @@ export function RecurringPayments() {
                 <div className="grid grid-cols-7 gap-2">
                   {blanks.map(b => <div key={`blank-${b}`} className="h-24 bg-slate-50/50 rounded-lg border border-slate-100/50"></div>)}
                   {days.map(d => {
-                    // Very simple mock matching for calendar
-                    const dateStr = `2026-07-${d.toString().padStart(2, '0')}`;
-                    const dayPayments = payments.filter(p => p.nextDue === dateStr);
-                    const isToday = d === 20 && currentMonth.getMonth() === 6; // Mock today
+                    const monthStr = (currentMonth.getMonth() + 1).toString().padStart(2, '0');
+                    const dateStr = `${currentMonth.getFullYear()}-${monthStr}-${d.toString().padStart(2, '0')}`;
+                    const dayPayments = livePayments.filter(p => p.next_due_date === dateStr && p.liveStatus !== 'Paused');
+                    const isToday = d === new Date().getDate() && currentMonth.getMonth() === new Date().getMonth() && currentMonth.getFullYear() === new Date().getFullYear();
 
                     return (
                       <div key={d} className={`h-24 p-1.5 rounded-lg border ${isToday ? 'border-primary bg-blue-50/30' : 'border-slate-100 hover:border-slate-300'} transition-colors flex flex-col relative`}>
                         <span className={`text-xs font-bold ${isToday ? 'text-primary' : 'text-slate-700'}`}>{d}</span>
                         <div className="mt-1 flex-1 overflow-y-auto space-y-1 scrollbar-hide">
-                          {dayPayments.map(p => (
-                            <div key={p.id} className="text-[10px] p-1 rounded font-medium flex items-center gap-1 truncate" style={{backgroundColor: `${p.color}15`, color: p.color}}>
-                              <p.icon className="w-3 h-3 shrink-0" /> {p.name}
-                            </div>
-                          ))}
+                          {dayPayments.map(p => {
+                            const Icon = getCategoryIcon(p.category);
+                            return (
+                              <div key={p.id} className="text-[10px] p-1 rounded font-medium flex items-center gap-1 truncate" style={{backgroundColor: `${p.color_theme || '#3B82F6'}15`, color: p.color_theme || '#3B82F6'}}>
+                                <Icon className="w-3 h-3 shrink-0" /> {p.name}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -438,8 +511,8 @@ export function RecurringPayments() {
                 </div>
                 <div className="flex gap-4 mt-6 text-xs font-medium text-slate-600 justify-center">
                   <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> Upcoming</span>
-                  <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> Paid</span>
-                  <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500"></div> Missed</span>
+                  <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div> Due Today</span>
+                  <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500"></div> Overdue</span>
                 </div>
               </CardContent>
             </Card>
@@ -448,7 +521,7 @@ export function RecurringPayments() {
           {activeTab === 'History' && (
             <Card>
               <CardHeader className="border-b border-slate-100 pb-4">
-                <CardTitle>Payment History</CardTitle>
+                <CardTitle>Payment History (Auto-Generated)</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <table className="w-full text-left border-collapse">
@@ -456,24 +529,29 @@ export function RecurringPayments() {
                     <tr className="bg-slate-50 border-b border-slate-100 text-xs text-slate-500 font-bold uppercase tracking-wider">
                       <th className="p-4 rounded-tl-lg">Date</th>
                       <th className="p-4">Payment</th>
-                      <th className="p-4">Method</th>
-                      <th className="p-4">Status</th>
+                      <th className="p-4">Category</th>
                       <th className="p-4 text-right rounded-tr-lg">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {paymentHistory.map((h) => (
                       <tr key={h.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-4 text-sm text-slate-600 whitespace-nowrap">{h.date}</td>
+                        <td className="p-4 text-sm text-slate-600 whitespace-nowrap">{new Date(h.date).toLocaleDateString()}</td>
                         <td className="p-4">
-                          <p className="font-bold text-slate-900">{h.name}</p>
-                          <p className="text-xs text-slate-500">Ref: {h.ref}</p>
+                          <p className="font-bold text-slate-900">{h.payee}</p>
+                          <p className="text-xs text-slate-500">Auto-Generated</p>
                         </td>
-                        <td className="p-4 text-sm text-slate-600">{h.method}</td>
-                        <td className="p-4">{renderStatusBadge(h.status)}</td>
+                        <td className="p-4 text-sm text-slate-600">
+                          <span className="px-2 py-1 bg-slate-100 rounded text-xs font-medium">{h.category}</span>
+                        </td>
                         <td className="p-4 text-right font-bold text-slate-900">{formatInr(h.amount)}</td>
                       </tr>
                     ))}
+                    {paymentHistory.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="p-8 text-center text-slate-500 text-sm">No transaction history found for recurring payments.</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </CardContent>
@@ -527,125 +605,53 @@ export function RecurringPayments() {
               </div>
               
               <div className="space-y-3">
-                <div className="bg-white/80 backdrop-blur-sm p-3.5 rounded-xl border border-indigo-50 shadow-sm hover:shadow-md transition-shadow">
-                  <p className="text-sm flex items-start gap-2.5">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <span className="text-indigo-900">You currently spend <strong>{formatInr(2850)}/mo</strong> on subscriptions. Cancelling Amazon Prime would save {formatInr(1499)}/yr.</span>
-                  </p>
-                </div>
-                <div className="bg-white/80 backdrop-blur-sm p-3.5 rounded-xl border border-indigo-50 shadow-sm hover:shadow-md transition-shadow">
-                  <p className="text-sm flex items-start gap-2.5">
-                    <PieChartIcon className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                    <span className="text-indigo-900">Your OTT subscriptions have increased by 28% this year. Consider downgrading Netflix to Mobile-only.</span>
-                  </p>
-                </div>
-                <div className="bg-white/80 backdrop-blur-sm p-3.5 rounded-xl border border-indigo-50 shadow-sm hover:shadow-md transition-shadow">
-                  <p className="text-sm flex items-start gap-2.5">
-                    <Zap className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                    <span className="text-indigo-900">Electricity bills are increasing every month. This is reducing your budget surplus for the Vacation Goal.</span>
-                  </p>
-                </div>
+                {insights.map((msg, idx) => (
+                  <div key={idx} className="bg-white/80 backdrop-blur-sm p-3.5 rounded-xl border border-indigo-50 shadow-sm hover:shadow-md transition-shadow">
+                    <p className="text-sm flex items-start gap-2.5">
+                      {msg.includes('Warning') ? <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" /> : 
+                       msg.includes('thousands') ? <PieChartIcon className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" /> :
+                       <Zap className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />}
+                      <span className="text-indigo-900">{msg}</span>
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Auto Detection */}
-          <Card className="border-emerald-100 bg-emerald-50/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2 text-emerald-800"><Sparkles className="w-4 h-4 text-emerald-600"/> Auto-Detected Recurring</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-emerald-700 mb-3">We found 2 transactions that look like recurring payments.</p>
-              <div className="space-y-3">
-                {autoDetectTransactions.map(ad => (
-                  <div key={ad.id} className="bg-white p-3 rounded-lg border border-emerald-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
-                        <ad.icon className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">{ad.name}</p>
-                        <p className="text-xs text-slate-500">{formatInr(ad.amount)} • {ad.frequency}</p>
-                      </div>
-                    </div>
-                    <button className="text-xs font-bold text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded transition-colors">Add</button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Distribution Pie */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Annual Distribution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[220px] w-full flex items-center justify-center">
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie data={categoryDistribution} cx="50%" cy="50%" innerRadius={65} outerRadius={90} paddingAngle={2} dataKey="value" stroke="none">
-                      {categoryDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '8px', fontSize: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number) => formatInr(value)} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="space-y-2 mt-4 max-h-[150px] overflow-y-auto pr-2">
-                {categoryDistribution.map((c, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm p-1 hover:bg-slate-50 rounded">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-md" style={{backgroundColor: c.color}}></div>
-                      <span className="text-slate-600 font-medium truncate max-w-[120px]">{c.name}</span>
+          {categoryDistribution.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Annual Cost Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[220px] w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={categoryDistribution} cx="50%" cy="50%" innerRadius={65} outerRadius={90} paddingAngle={2} dataKey="value" stroke="none">
+                        {categoryDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: '8px', fontSize: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number) => formatInr(value)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-2 mt-4 max-h-[150px] overflow-y-auto pr-2">
+                  {categoryDistribution.sort((a,b) => b.value - a.value).map((c, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm p-1 hover:bg-slate-50 rounded">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-md" style={{backgroundColor: c.color}}></div>
+                        <span className="text-slate-600 font-medium truncate max-w-[120px]">{c.name}</span>
+                      </div>
+                      <span className="font-bold text-slate-900">{formatInr(c.value)}</span>
                     </div>
-                    <span className="font-bold text-slate-900">{formatInr(c.value)}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Expense Trend Bar Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Monthly Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[200px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyExpenseBarData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(value) => `₹${value/1000}k`} />
-                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number) => formatInr(value)} />
-                    <Bar dataKey="amount" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Analytics Line Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recurring Expense Trend</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[200px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={expenseTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(value) => `₹${value/1000}k`} />
-                    <Tooltip cursor={{stroke: '#e2e8f0', strokeWidth: 2}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number) => formatInr(value)} />
-                    <Line type="monotone" dataKey="amount" name="Expenses" stroke="#8B5CF6" strokeWidth={3} dot={{r: 4, fill: '#8B5CF6', strokeWidth: 2, stroke: '#fff'}} activeDot={{r: 6}} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
         </div>
       </div>
@@ -653,7 +659,7 @@ export function RecurringPayments() {
       {/* Add / Edit Recurring Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
@@ -718,51 +724,35 @@ export function RecurringPayments() {
                       <input required type="date" value={formData.nextDue} onChange={e => setFormData({...formData, nextDue: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all bg-white text-slate-700" />
                     </div>
                     <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Reminder Before</label>
-                      <select value={formData.reminder} onChange={e => setFormData({...formData, reminder: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all bg-white">
-                        <option>1 Day Before</option>
-                        <option>2 Days Before</option>
-                        <option>3 Days Before</option>
-                        <option>1 Week Before</option>
-                      </select>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Reminder Before (Days)</label>
+                      <input type="number" value={formData.reminder} onChange={e => setFormData({...formData, reminder: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all bg-white text-slate-700" />
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-primary/30 transition-colors" onClick={() => setFormData({...formData, autoDebit: !formData.autoDebit})}>
-                    <input type="checkbox" id="autoDebit" checked={formData.autoDebit} onChange={e => setFormData({...formData, autoDebit: e.target.checked})} className="w-5 h-5 text-primary rounded border-slate-300 focus:ring-primary pointer-events-none" />
-                    <div>
-                      <label className="text-sm font-bold text-slate-900 block cursor-pointer">Auto Debit Enabled</label>
-                      <span className="text-xs text-slate-500">Automatically deducted from linked bank account</span>
-                    </div>
+                  
+                  <div className="flex items-center gap-3 bg-white p-4 rounded-xl border border-slate-200">
+                    <input type="checkbox" id="autoDebit" checked={formData.autoDebit} onChange={e => setFormData({...formData, autoDebit: e.target.checked})} className="w-5 h-5 text-primary rounded focus:ring-primary border-slate-300" />
+                    <label htmlFor="autoDebit" className="text-sm font-bold text-slate-700 cursor-pointer">Enable Auto-Pay / Auto-Debit</label>
                   </div>
-
+                  
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-3">Badge Color Theme</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Color Theme</label>
                     <div className="flex flex-wrap gap-3">
                       {presetColors.map(c => (
                         <button 
                           key={c} type="button" onClick={() => setFormData({...formData, color: c})}
-                          className={`w-10 h-10 rounded-full border-2 transition-all shadow-sm flex items-center justify-center ${formData.color === c ? 'border-slate-900 scale-110 ring-4 ring-slate-100' : 'border-white hover:scale-110'}`}
+                          className={`w-8 h-8 rounded-full border-2 transition-transform ${formData.color === c ? 'border-slate-900 scale-110 shadow-sm' : 'border-transparent hover:scale-105'}`}
                           style={{ backgroundColor: c }}
-                        >
-                          {formData.color === c && <CheckCircle className="w-5 h-5 text-white/90" />}
-                        </button>
+                        />
                       ))}
                     </div>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Notes (Optional)</label>
-                    <textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all bg-white resize-none" placeholder="Add any details, account numbers, or links..." rows={3}></textarea>
-                  </div>
-
                 </form>
               </div>
 
-              <div className="px-6 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0 z-10">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-700 font-bold hover:bg-slate-100 rounded-xl transition-colors">Cancel</button>
-                <button type="submit" form="recurring-form" className="px-5 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                  {editingPayment ? <><Edit3 className="w-4 h-4"/> Save Changes</> : <><Plus className="w-4 h-4"/> Add Payment</>}
+              <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-end gap-3 sticky bottom-0">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-700 font-bold hover:bg-slate-100 rounded-xl transition-colors text-sm">Cancel</button>
+                <button type="submit" form="recurring-form" className="px-5 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-sm shadow-primary/20 text-sm">
+                  {editingPayment ? 'Save Changes' : 'Create Payment'}
                 </button>
               </div>
             </motion.div>

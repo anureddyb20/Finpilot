@@ -289,3 +289,14 @@ ADD COLUMN IF NOT EXISTS notes TEXT;
 
 ALTER TABLE public.transactions
 ADD COLUMN IF NOT EXISTS goal_id UUID REFERENCES public.goals(id) ON DELETE SET NULL;
+
+
+-- 21. Alter Recurring Payments for Dynamic Module Requirements
+ALTER TABLE public.recurring_payments 
+ADD COLUMN IF NOT EXISTS auto_pay BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS payment_method TEXT,
+ADD COLUMN IF NOT EXISTS merchant TEXT,
+ADD COLUMN IF NOT EXISTS notes TEXT,
+ADD COLUMN IF NOT EXISTS reminder_days INTEGER DEFAULT 3,
+ADD COLUMN IF NOT EXISTS next_due_date DATE,
+ADD COLUMN IF NOT EXISTS color_theme TEXT;

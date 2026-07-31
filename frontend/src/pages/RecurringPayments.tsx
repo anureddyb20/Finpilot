@@ -171,13 +171,16 @@ export function RecurringPayments() {
       };
 
       if (editingPayment) {
-        await supabase.from('recurring_payments').update(payload).eq('id', editingPayment.id);
+        const { error } = await supabase.from('recurring_payments').update(payload).eq('id', editingPayment.id);
+        if (error) throw error;
       } else {
-        await supabase.from('recurring_payments').insert({...payload, status: 'Active'});
+        const { error } = await supabase.from('recurring_payments').insert({...payload, status: 'Active'});
+        if (error) throw error;
       }
       setIsModalOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert("Failed to save payment: " + (err.message || "Unknown error. Did you run the SQL script in Supabase?"));
     }
   };
 

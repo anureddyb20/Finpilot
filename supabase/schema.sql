@@ -266,3 +266,14 @@ BEGIN
 EXCEPTION
   WHEN undefined_object THEN NULL;
 END $$;
+
+
+-- 19. Alter Budgets Table for Dynamic Module Requirements
+ALTER TABLE public.budgets 
+ADD COLUMN IF NOT EXISTS name TEXT,
+ADD COLUMN IF NOT EXISTS start_date DATE,
+ADD COLUMN IF NOT EXISTS end_date DATE,
+ADD COLUMN IF NOT EXISTS alert_threshold INTEGER DEFAULT 75,
+ADD COLUMN IF NOT EXISTS notes TEXT,
+ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Active',
+ADD COLUMN IF NOT EXISTS color TEXT;

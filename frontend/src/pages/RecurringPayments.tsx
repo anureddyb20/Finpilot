@@ -229,21 +229,24 @@ export function RecurringPayments() {
       else if (p.category.includes('Subscription') || p.category.includes('OTT')) txCategory = 'Subscription';
       else txCategory = 'Bill Payment';
 
-      await Promise.all([
-        supabase.from('recurring_payments').update({ next_due_date: newDate }).eq('id', p.id),
-        supabase.from('transactions').insert({
+      const { error: updateError } = await supabase.from('recurring_payments').update({ next_due_date: newDate }).eq('id', p.id);
+      if (updateError) throw updateError;
+      
+      const { error: insertError } = await supabase.from('transactions').insert({
           user_id: user.id,
           amount: p.amount,
           date: today,
+          time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: "numeric", minute: "numeric" }),
           type: 'expense',
           category: txCategory,
-          payee: p.merchant || p.name,
-          payment_method: p.payment_method || 'Net Banking',
+          merchant: p.merchant || p.name,
+          method: p.payment_method || 'Net Banking',
           notes: `Auto-generated from Recurring Payments`
-        })
-      ]);
-    } catch (err) {
+        });
+      if (insertError) throw insertError;
+    } catch (err: any) {
       console.error(err);
+      alert("Failed to mark as paid: " + (err.message || "Unknown error"));
     }
   };
 

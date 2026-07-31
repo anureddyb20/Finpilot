@@ -90,6 +90,57 @@ export function Dashboard() {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [newBudget, setNewBudget] = useState({ category: 'Food', limit: '' });
+  const [newGoal, setNewGoal] = useState({ name: '', target: '', date: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCreateBudget = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const today = new Date();
+      await supabase.from('budgets').insert({
+        user_id: user.id,
+        category: newBudget.category,
+        limit_amount: Number(newBudget.limit),
+        spent_amount: 0,
+        month: today.getMonth(),
+        year: today.getFullYear()
+      });
+      setShowBudgetModal(false);
+      setNewBudget({ category: 'Food', limit: '' });
+    } catch (err) {
+      console.error(err);
+    }
+    setIsSubmitting(false);
+  };
+
+  const handleCreateGoal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      await supabase.from('goals').insert({
+        user_id: user.id,
+        name: newGoal.name,
+        target_amount: Number(newGoal.target),
+        saved_amount: 0,
+        target_date: newGoal.date || null,
+        color_theme: 'blue',
+        icon_name: 'Target'
+      });
+      setShowGoalModal(false);
+      setNewGoal({ name: '', target: '', date: '' });
+    } catch (err) {
+      console.error(err);
+    }
+    setIsSubmitting(false);
+  };
+
+
   // DB States
   const [transactions, setTransactions] = useState<any[]>([]);
   const [budgets, setBudgets] = useState<any[]>([]);
@@ -762,8 +813,8 @@ export function Dashboard() {
               className="flex flex-col gap-2 mb-2"
             >
               {[
-                { label: 'Create Goal', icon: Target, color: 'text-purple-600', bg: 'bg-purple-50' },
-                { label: 'Create Budget', icon: Activity, color: 'text-orange-600', bg: 'bg-orange-50' },
+                { label: 'Create Goal', icon: Target, color: 'text-purple-600', bg: 'bg-purple-50', action: () => setShowGoalModal(true) },
+                { label: 'Create Budget', icon: Activity, color: 'text-orange-600', bg: 'bg-orange-50', action: () => setShowBudgetModal(true) },
                 { label: 'Add Transaction', icon: Plus, color: 'text-emerald-600', bg: 'bg-emerald-50', action: () => navigate('/transactions') },
               ].map((action, i) => (
                 <motion.button 
@@ -788,6 +839,84 @@ export function Dashboard() {
         </button>
       </div>
 
+
+      {/* Quick Add Budget Modal */}
+      {showBudgetModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <h2 className="text-xl font-bold mb-4">Create Quick Budget</h2>
+            <form onSubmit={handleCreateBudget} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                <select 
+                  required className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                  value={newBudget.category} onChange={e => setNewBudget({...newBudget, category: e.target.value})}
+                >
+                  <option value="Food">Food & Dining</option>
+                  <option value="Shopping">Shopping</option>
+                  <option value="Travel">Travel</option>
+                  <option value="Entertainment">Entertainment</option>
+                  <option value="Bills">Bills & Utilities</option>
+                  <option value="Rent">Rent</option>
+                  <option value="Healthcare">Healthcare</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Monthly Limit (₹)</label>
+                <input 
+                  type="number" required placeholder="e.g. 10000"
+                  className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                  value={newBudget.limit} onChange={e => setNewBudget({...newBudget, limit: e.target.value})}
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowBudgetModal(false)} className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50">Create Budget</button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Quick Add Goal Modal */}
+      {showGoalModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <h2 className="text-xl font-bold mb-4">Create Savings Goal</h2>
+            <form onSubmit={handleCreateGoal} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Goal Name</label>
+                <input 
+                  type="text" required placeholder="e.g. New Laptop"
+                  className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                  value={newGoal.name} onChange={e => setNewGoal({...newGoal, name: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Target Amount (₹)</label>
+                <input 
+                  type="number" required placeholder="e.g. 80000"
+                  className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                  value={newGoal.target} onChange={e => setNewGoal({...newGoal, target: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Target Date (Optional)</label>
+                <input 
+                  type="date"
+                  className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                  value={newGoal.date} onChange={e => setNewGoal({...newGoal, date: e.target.value})}
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowGoalModal(false)} className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50">Create Goal</button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
+

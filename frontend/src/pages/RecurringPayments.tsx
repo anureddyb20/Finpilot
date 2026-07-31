@@ -167,7 +167,9 @@ export function RecurringPayments() {
         auto_pay: formData.autoDebit,
         reminder_days: Number(formData.reminder),
         color_theme: formData.color,
-        notes: formData.notes
+        notes: formData.notes,
+        due_date: formData.nextDue ? new Date(formData.nextDue).getDate() : 1, // Satisfy deprecated NOT NULL constraint
+        is_urgent: false // Satisfy deprecated constraint
       };
 
       if (editingPayment) {

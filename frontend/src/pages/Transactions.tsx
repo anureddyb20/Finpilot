@@ -205,7 +205,7 @@ export function Transactions() {
         try {
           const { error } = await supabase
             .from('transactions')
-            .update({ deleted_at: new Date().toISOString() })
+            .delete()
             .in('id', selectedTxnIds);
 
           if (error) throw error;
@@ -542,7 +542,7 @@ export function Transactions() {
                             try {
                               const { error } = await supabase
                                 .from('transactions')
-                                .update({ deleted_at: new Date().toISOString() })
+                                .delete()
                                 .eq('id', viewTxn.id);
                               if (error) throw error;
                               setTransactions(transactions.filter(t => t.id !== viewTxn.id));

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
   ArrowUpRight, Plus, AlertTriangle, 
-  Bot, Edit3, Trash2, X, Target, CalendarDays, PieChart as PieChartIcon, CheckCircle2, TrendingDown,
+  Bot, Edit3, Trash2, X, Target, CheckCircle2,
   ShoppingBag, Utensils, Home, Zap, HeartPulse, Car, FileText, Briefcase, Monitor, RotateCcw,
   Sliders
 } from 'lucide-react';
@@ -52,9 +53,10 @@ export function Budgets() {
   const { user } = useAuth();
   const [budgets, setBudgets] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [confirmState, setConfirmState] = useState<{isOpen: boolean; id: string | null}>({ isOpen: false, id: null });
   
   // Form State
   const [formData, setFormData] = useState({
@@ -125,7 +127,6 @@ export function Budgets() {
   const totalSpent = liveBudgets.reduce((acc, curr) => acc + curr.spent_amount, 0);
   const totalRemaining = totalAllocated - totalSpent;
   const overallUtilization = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
-  const exceededCount = liveBudgets.filter(b => b.spent_amount > b.limit_amount).length;
 
   // Simulator Derived values
   const simulatedTotalAllocated = Object.values(simulatedLimits).reduce((acc, curr) => acc + curr, 0);
@@ -163,8 +164,13 @@ export function Budgets() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this budget?")) {
-      await supabase.from('budgets').delete().eq('id', id);
+    setConfirmState({ isOpen: true, id });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (confirmState.id) {
+      await supabase.from('budgets').delete().eq('id', confirmState.id);
+      setConfirmState({ isOpen: false, id: null });
     }
   };
 
@@ -576,6 +582,15 @@ export function Budgets() {
           </div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        title="Delete Budget"
+        message="Are you sure you want to delete this budget?"
+        confirmText="Delete"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmState({ isOpen: false, id: null })}
+      />
     </div>
   );
 }

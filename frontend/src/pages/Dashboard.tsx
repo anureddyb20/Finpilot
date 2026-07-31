@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
   ArrowUpRight, ArrowDownRight, Wallet, PiggyBank, CreditCard, TrendingUp,
-  Search, Bell, Plus, Minus, Send, Target, Sparkles, Brain, Clock, 
+  Plus, Target, Sparkles, Brain, Clock, 
   ShoppingCart, Utensils, Zap, Car, Briefcase, Activity, CheckCircle2,
-  AlertTriangle, Laptop, Plane, FileText, RotateCcw, Monitor
+  AlertTriangle, FileText, RotateCcw, Monitor
 } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell } from 'recharts';
 import { supabase } from '../lib/supabase';
@@ -115,7 +116,7 @@ export function Dashboard() {
       setNewBudget({ category: 'Food', limit: '' });
     } catch (err: any) {
       console.error(err);
-      alert("Failed to create budget: " + (err.message || "Unknown error"));
+      toast.error("Failed to create budget: " + (err.message || "Unknown error"));
     }
     setIsSubmitting(false);
   };
@@ -139,7 +140,7 @@ export function Dashboard() {
       setNewGoal({ name: '', target: '', date: '' });
     } catch (err: any) {
       console.error(err);
-      alert("Failed to create goal: " + (err.message || "Unknown error"));
+      toast.error("Failed to create goal: " + (err.message || "Unknown error"));
     }
     setIsSubmitting(false);
   };

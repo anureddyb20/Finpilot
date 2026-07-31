@@ -18,9 +18,12 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 // Main Application Router
+import { Toaster } from 'react-hot-toast';
+
 function App() {
   return (
     <AuthProvider>
+      <Toaster position="bottom-right" toastOptions={{ duration: 4000, style: { background: '#334155', color: '#fff', borderRadius: '12px', fontSize: '14px', fontWeight: 500 } }} />
       <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />

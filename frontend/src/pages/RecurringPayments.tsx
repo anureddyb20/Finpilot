@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
+import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
-  ArrowUpRight, ArrowDownRight, Plus, Bot, Edit3, Trash2, X, CalendarDays, 
+  Plus, Bot, Edit3, Trash2, X, CalendarDays, 
   CreditCard, Tv, Zap, Wifi, Smartphone, Shield, Car, Home, 
   Activity, CheckCircle2, Clock, AlertTriangle, RefreshCw, BarChart2, PieChart as PieChartIcon,
-  Calendar, Sparkles, CheckCircle, ChevronRight, ChevronLeft, Building2, Dumbbell, Server
+  Calendar, CheckCircle, ChevronRight, ChevronLeft, Building2, Dumbbell, Server
 } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -58,6 +60,7 @@ export function RecurringPayments() {
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'All' | 'Subscriptions' | 'Bills' | 'EMI' | 'SIP' | 'Insurance' | 'Calendar' | 'History'>('All');
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [confirmState, setConfirmState] = useState<{isOpen: boolean; id: string | null}>({ isOpen: false, id: null });
   
   // Form State
   const [formData, setFormData] = useState({
@@ -148,7 +151,7 @@ export function RecurringPayments() {
       acc[curr.category || 'Other'] = (acc[curr.category || 'Other'] || 0) + annual;
       return acc;
     }, {} as Record<string, number>)
-  ).map(([name, value], idx) => ({ name, value, color: presetColors[idx % presetColors.length] }));
+  ).map(([name, value], idx) => ({ name, value: Number(value), color: presetColors[idx % presetColors.length] }));
 
   // Handlers
   const handleSave = async (e: React.FormEvent) => {
@@ -182,13 +185,18 @@ export function RecurringPayments() {
       setIsModalOpen(false);
     } catch (err: any) {
       console.error(err);
-      alert("Failed to save payment: " + (err.message || "Unknown error. Did you run the SQL script in Supabase?"));
+      toast.error("Failed to save payment: " + (err.message || "Unknown error. Did you run the SQL script in Supabase?"));
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to permanently delete this recurring payment?")) {
-      await supabase.from('recurring_payments').delete().eq('id', id);
+  const deletePayment = async (id: string) => {
+    setConfirmState({ isOpen: true, id });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (confirmState.id) {
+      await supabase.from('recurring_payments').delete().eq('id', confirmState.id);
+      setConfirmState({ isOpen: false, id: null });
     }
   };
 
@@ -248,10 +256,10 @@ export function RecurringPayments() {
         });
       if (insertError) throw insertError;
       
-      alert(`Success! Marked ${p.name} as paid. Next due date is now ${newDate}. The transaction has been added to your ledger.`);
+      toast.success(`Success! Marked ${p.name} as paid. Next due date is now ${newDate}. The transaction has been added to your ledger.`);
     } catch (err: any) {
       console.error(err);
-      alert("Failed to mark as paid: " + (err.message || "Unknown error"));
+      toast.error("Failed to mark as paid: " + (err.message || "Unknown error"));
     }
   };
 
@@ -273,7 +281,7 @@ export function RecurringPayments() {
 
   const renderStatusBadge = (liveStatus: string) => {
     switch(liveStatus) {
-      case 'Upcoming': return <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center gap-1"><Clock className="w-3 h-3"/> Upcoming</span>;
+      case 'Upcoming': return <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Paid</span>;
       case 'Due Today': return <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Due Today</span>;
       case 'Overdue': return <span className="px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Overdue</span>;
       case 'Paused': return <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1"><X className="w-3 h-3"/> Paused</span>;
@@ -340,7 +348,7 @@ export function RecurringPayments() {
           <button onClick={() => setActiveTab('Calendar')} className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2">
             <CalendarDays className="w-4 h-4" /> Calendar
           </button>
-          <button onClick={() => window.alert('Opening AI Advisor Chat')} className="px-4 py-2 bg-indigo-50 text-indigo-700 font-medium rounded-lg hover:bg-indigo-100 transition-colors flex items-center gap-2">
+          <button onClick={() => toast('Opening AI Advisor Chat')} className="px-4 py-2 bg-indigo-50 text-indigo-700 font-medium rounded-lg hover:bg-indigo-100 transition-colors flex items-center gap-2">
             <Bot className="w-4 h-4" /> Ask AI
           </button>
           <button onClick={() => openModal()} className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2 shadow-sm">
@@ -458,7 +466,7 @@ export function RecurringPayments() {
                             {p.status === 'Paused' ? 'Resume' : 'Pause'}
                           </button>
                           <button onClick={() => openModal(p)} className="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50 rounded"><Edit3 className="w-3.5 h-3.5"/></button>
-                          <button onClick={() => handleDelete(p.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5"/></button>
+                          <button onClick={() => deletePayment(p.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5"/></button>
                         </div>
                       </div>
                     );
@@ -773,6 +781,14 @@ export function RecurringPayments() {
         )}
       </AnimatePresence>
 
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        title="Delete Recurring Payment"
+        message="Are you sure you want to permanently delete this recurring payment? This action cannot be undone."
+        confirmText="Delete Payment"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmState({ isOpen: false, id: null })}
+      />
     </div>
   );
 }

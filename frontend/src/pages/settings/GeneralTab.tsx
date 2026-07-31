@@ -54,10 +54,10 @@ export function GeneralTab() {
         })
         .eq('id', user.id);
       if (error) throw error;
-      alert("Profile updated successfully");
+      toast.success("Profile updated successfully");
     } catch (error) {
       console.error("Error saving profile:", error);
-      alert("Error saving profile");
+      toast.error("Error saving profile");
     } finally {
       setSaving(false);
     }

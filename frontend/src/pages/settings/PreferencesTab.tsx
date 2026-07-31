@@ -55,10 +55,10 @@ export function PreferencesTab() {
         }, { onConflict: 'user_id' });
       
       if (error) throw error;
-      alert("Preferences updated successfully");
+      toast.success("Preferences updated successfully");
     } catch (error) {
       console.error("Error saving settings:", error);
-      alert("Error saving preferences");
+      toast.error("Error saving preferences");
     } finally {
       setSaving(false);
     }

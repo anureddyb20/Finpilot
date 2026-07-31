@@ -74,6 +74,15 @@ export function Transactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('All');
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    category: 'All',
+    dateRange: 'All',
+    paymentMethod: 'All',
+    status: 'All',
+    minAmount: '',
+    maxAmount: ''
+  });
   const [selectedTxnIds, setSelectedTxnIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -81,6 +90,13 @@ export function Transactions() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [viewTxn, setViewTxn] = useState<any>(null); // For detail view
   const [editingTxnId, setEditingTxnId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{message: string, type: 'success'|'error'} | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{title: string, message: string, onConfirm: () => void} | null>(null);
+  
+  const showToast = (message: string, type: 'success'|'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
   
   // New transaction form state
   const [newTxn, setNewTxn] = useState({
@@ -150,29 +166,60 @@ export function Transactions() {
         t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (t.notes && t.notes.toLowerCase().includes(searchTerm.toLowerCase())) ||
         t.id.toLowerCase().includes(searchTerm.toLowerCase());
+      
       const matchesType = selectedType === 'All' || t.type.toLowerCase() === selectedType.toLowerCase();
-      return matchesSearch && matchesType;
+      
+      const matchesCategory = filters.category === 'All' || t.category === filters.category;
+      const matchesMethod = filters.paymentMethod === 'All' || t.method === filters.paymentMethod;
+      const matchesStatus = filters.status === 'All' || t.status === filters.status;
+      
+      let matchesAmount = true;
+      if (filters.minAmount) matchesAmount = matchesAmount && t.amount >= parseFloat(filters.minAmount);
+      if (filters.maxAmount) matchesAmount = matchesAmount && t.amount <= parseFloat(filters.maxAmount);
+
+      let matchesDate = true;
+      if (filters.dateRange !== 'All') {
+        const today = new Date();
+        const txDate = new Date(t.date);
+        if (filters.dateRange === 'This Month') {
+          matchesDate = txDate.getMonth() === today.getMonth() && txDate.getFullYear() === today.getFullYear();
+        } else if (filters.dateRange === 'Last Month') {
+          const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          matchesDate = txDate.getMonth() === lastMonth.getMonth() && txDate.getFullYear() === lastMonth.getFullYear();
+        } else if (filters.dateRange === 'Last 7 Days') {
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(today.getDate() - 7);
+          matchesDate = txDate >= sevenDaysAgo;
+        }
+      }
+
+      return matchesSearch && matchesType && matchesCategory && matchesMethod && matchesStatus && matchesAmount && matchesDate;
     });
-  }, [transactions, searchTerm, selectedType]);
+  }, [transactions, searchTerm, selectedType, filters]);
 
   const handleDeleteSelected = async () => {
-    if (window.confirm(`Are you sure you want to delete ${selectedTxnIds.length} transactions?`)) {
-      try {
-        const { error } = await supabase
-          .from('transactions')
-          .update({ deleted_at: new Date().toISOString() })
-          .in('id', selectedTxnIds);
+    setConfirmDialog({
+      title: 'Delete Transactions',
+      message: `Are you sure you want to delete ${selectedTxnIds.length} selected transactions?`,
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('transactions')
+            .update({ deleted_at: new Date().toISOString() })
+            .in('id', selectedTxnIds);
 
-        if (error) throw error;
-        
-        setTransactions(transactions.filter(t => !selectedTxnIds.includes(t.id)));
-        setSelectedTxnIds([]);
-        setViewTxn(null);
-      } catch (error) {
-        console.error('Error deleting transactions:', error);
-        alert('Failed to delete transactions');
+          if (error) throw error;
+          
+          setTransactions(transactions.filter(t => !selectedTxnIds.includes(t.id)));
+          setSelectedTxnIds([]);
+          setViewTxn(null);
+          showToast('Transactions deleted successfully');
+        } catch (error: any) {
+          console.error('Error deleting transactions:', error);
+          showToast(error.message || 'Failed to delete transactions', 'error');
+        }
       }
-    }
+    });
   };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -217,9 +264,10 @@ export function Transactions() {
       setIsAddModalOpen(false);
       setEditingTxnId(null);
       setNewTxn({ type: 'Expense', amount: '', category: 'Food', method: 'UPI', merchant: '', date: '', time: '', notes: '', tags: '' });
+      showToast(editingTxnId ? 'Transaction updated successfully' : 'Transaction saved successfully');
     } catch (error) {
       console.error('Error saving transaction:', error);
-      alert('Failed to save transaction');
+      showToast(error.message || 'Failed to save transaction', 'error');
     }
   };
 
@@ -309,8 +357,11 @@ export function Transactions() {
                 <option value="Expense">Expense</option>
                 <option value="Transfer">Transfer</option>
               </select>
-              <button className="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2 text-sm">
+              <button onClick={() => setIsFilterModalOpen(true)} className="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2 text-sm relative">
                 <Filter className="w-4 h-4" /> Filters
+                {(filters.category !== 'All' || filters.dateRange !== 'All' || filters.paymentMethod !== 'All' || filters.status !== 'All' || filters.minAmount || filters.maxAmount) && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary rounded-full"></span>
+                )}
               </button>
             </div>
           </CardHeader>
@@ -484,20 +535,25 @@ export function Transactions() {
                         <Edit3 className="w-4 h-4"/> Edit
                       </button>
                       <button onClick={async () => {
-                        if(window.confirm('Delete this transaction?')) {
-                          try {
-                            const { error } = await supabase
-                              .from('transactions')
-                              .update({ deleted_at: new Date().toISOString() })
-                              .eq('id', viewTxn.id);
-                            if (error) throw error;
-                            setTransactions(transactions.filter(t => t.id !== viewTxn.id));
-                            setViewTxn(null);
-                          } catch (error) {
-                            console.error('Error deleting transaction:', error);
-                            alert('Failed to delete transaction');
+                        setConfirmDialog({
+                          title: 'Delete Transaction',
+                          message: 'Are you sure you want to delete this transaction?',
+                          onConfirm: async () => {
+                            try {
+                              const { error } = await supabase
+                                .from('transactions')
+                                .update({ deleted_at: new Date().toISOString() })
+                                .eq('id', viewTxn.id);
+                              if (error) throw error;
+                              setTransactions(transactions.filter(t => t.id !== viewTxn.id));
+                              setViewTxn(null);
+                              showToast('Transaction deleted successfully');
+                            } catch (error: any) {
+                              console.error('Error deleting transaction:', error);
+                              showToast(error.message || 'Failed to delete transaction', 'error');
+                            }
                           }
-                        }
+                        });
                       }} className="flex-1 bg-red-50 text-red-600 py-2 rounded-lg text-sm font-medium hover:bg-red-100 flex items-center justify-center gap-2">
                         <Trash2 className="w-4 h-4"/> Delete
                       </button>
@@ -686,6 +742,180 @@ export function Transactions() {
         )}
       </AnimatePresence>
 
+
+            {/* Filter Modal */}
+      <AnimatePresence>
+        {isFilterModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setIsFilterModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h2 className="text-lg font-bold text-slate-900">Filters</h2>
+                <button onClick={() => setIsFilterModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1 space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
+                  <select 
+                    value={filters.category} 
+                    onChange={e => setFilters({...filters, category: e.target.value})} 
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  >
+                    <option value="All">All Categories</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Date Range</label>
+                  <select 
+                    value={filters.dateRange} 
+                    onChange={e => setFilters({...filters, dateRange: e.target.value})} 
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  >
+                    <option value="All">All Time</option>
+                    <option value="Last 7 Days">Last 7 Days</option>
+                    <option value="This Month">This Month</option>
+                    <option value="Last Month">Last Month</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Payment Method</label>
+                  <select 
+                    value={filters.paymentMethod} 
+                    onChange={e => setFilters({...filters, paymentMethod: e.target.value})} 
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  >
+                    <option value="All">All Methods</option>
+                    {paymentMethods.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
+                  <select 
+                    value={filters.status} 
+                    onChange={e => setFilters({...filters, status: e.target.value})} 
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Refunded">Refunded</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Min Amount (₹)</label>
+                    <input 
+                      type="number" 
+                      value={filters.minAmount} 
+                      onChange={e => setFilters({...filters, minAmount: e.target.value})} 
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary" 
+                      placeholder="0" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Max Amount (₹)</label>
+                    <input 
+                      type="number" 
+                      value={filters.maxAmount} 
+                      onChange={e => setFilters({...filters, maxAmount: e.target.value})} 
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary" 
+                      placeholder="No limit" 
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <button 
+                  onClick={() => {
+                    setFilters({ category: 'All', dateRange: 'All', paymentMethod: 'All', status: 'All', minAmount: '', maxAmount: '' });
+                  }}
+                  className="text-sm font-medium text-slate-500 hover:text-slate-700"
+                >
+                  Reset All
+                </button>
+                <button 
+                  onClick={() => setIsFilterModalOpen(false)} 
+                  className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: 50 }}
+            className={`fixed bottom-4 right-4 z-[60] px-4 py-3 rounded-lg shadow-xl border flex items-center gap-3 text-sm font-medium ${
+              toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            }`}
+          >
+            {toast.type === 'error' ? <X className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation Dialog */}
+      <AnimatePresence>
+        {confirmDialog && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setConfirmDialog(null)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6"
+            >
+              <h3 className="text-lg font-bold text-slate-900 mb-2">{confirmDialog.title}</h3>
+              <p className="text-slate-500 text-sm mb-6">{confirmDialog.message}</p>
+              <div className="flex gap-3 justify-end">
+                <button 
+                  onClick={() => setConfirmDialog(null)} 
+                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-50 rounded-lg transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    confirmDialog.onConfirm();
+                    setConfirmDialog(null);
+                  }} 
+                  className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors text-sm"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

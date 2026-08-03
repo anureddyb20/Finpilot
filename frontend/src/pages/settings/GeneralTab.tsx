@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
-import { Camera, CheckCircle2, AlertCircle, User as UserIcon } from 'lucide-react';
+import { Camera, CheckCircle2, User as UserIcon } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 

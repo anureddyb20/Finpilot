@@ -232,9 +232,16 @@ CREATE TABLE public.notifications (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   title TEXT NOT NULL,
-  message TEXT NOT NULL,
-  type TEXT DEFAULT 'info',
+  description TEXT NOT NULL,
+  category TEXT NOT NULL,
+  type TEXT DEFAULT 'information',
+  related_module TEXT,
+  related_record_id UUID,
+  priority TEXT DEFAULT 'low',
   is_read BOOLEAN DEFAULT false,
+  is_archived BOOLEAN DEFAULT false,
+  action_url TEXT,
+  read_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -243,6 +250,97 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can manage own notifications" 
 ON public.notifications FOR ALL 
 USING (auth.uid() = user_id);
+
+-- 17a. Create Notification Triggers
+
+-- Transaction Trigger
+CREATE OR REPLACE FUNCTION public.handle_new_transaction()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.type = 'expense' THEN
+    INSERT INTO public.notifications (user_id, title, description, category, type, related_module, related_record_id, priority, action_url)
+    VALUES (
+      NEW.user_id,
+      'Transaction Added',
+      'Expense of ₹' || NEW.amount || ' added under ' || NEW.category || '.',
+      'transactions',
+      'information',
+      'transactions',
+      NEW.id,
+      'low',
+      '/transactions'
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_transaction_created ON public.transactions;
+CREATE TRIGGER on_transaction_created
+  AFTER INSERT ON public.transactions
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_transaction();
+
+
+-- Budget Trigger
+CREATE OR REPLACE FUNCTION public.handle_budget_update()
+RETURNS trigger AS $$
+DECLARE
+  old_pct numeric;
+  new_pct numeric;
+BEGIN
+  IF NEW.limit_amount > 0 THEN
+    old_pct := (OLD.spent_amount / OLD.limit_amount) * 100;
+    new_pct := (NEW.spent_amount / NEW.limit_amount) * 100;
+
+    -- Check for exceeding 100%
+    IF new_pct >= 100 AND old_pct < 100 THEN
+      INSERT INTO public.notifications (user_id, title, description, category, type, related_module, related_record_id, priority, action_url)
+      VALUES (NEW.user_id, 'Budget Exceeded', 'You have exceeded your ' || COALESCE(NEW.name, NEW.category) || ' budget.', 'budgets', 'critical', 'budgets', NEW.id, 'high', '/budgets');
+    -- Check for reaching 75%
+    ELSIF new_pct >= 75 AND old_pct < 75 THEN
+      INSERT INTO public.notifications (user_id, title, description, category, type, related_module, related_record_id, priority, action_url)
+      VALUES (NEW.user_id, 'Budget Alert', 'Your ' || COALESCE(NEW.name, NEW.category) || ' budget has reached 75%.', 'budgets', 'warning', 'budgets', NEW.id, 'medium', '/budgets');
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_budget_updated ON public.budgets;
+CREATE TRIGGER on_budget_updated
+  AFTER UPDATE ON public.budgets
+  FOR EACH ROW EXECUTE FUNCTION public.handle_budget_update();
+
+
+-- Goals Trigger
+CREATE OR REPLACE FUNCTION public.handle_goal_update()
+RETURNS trigger AS $$
+DECLARE
+  old_pct numeric;
+  new_pct numeric;
+BEGIN
+  IF NEW.target_amount > 0 THEN
+    old_pct := (OLD.saved_amount / OLD.target_amount) * 100;
+    new_pct := (NEW.saved_amount / NEW.target_amount) * 100;
+
+    -- Check for completion
+    IF new_pct >= 100 AND old_pct < 100 THEN
+      INSERT INTO public.notifications (user_id, title, description, category, type, related_module, related_record_id, priority, action_url)
+      VALUES (NEW.user_id, 'Goal Completed', 'You have successfully completed your ' || NEW.name || ' goal.', 'goals', 'achievement', 'goals', NEW.id, 'medium', '/goals');
+    -- Check for 50%
+    ELSIF new_pct >= 50 AND old_pct < 50 THEN
+      INSERT INTO public.notifications (user_id, title, description, category, type, related_module, related_record_id, priority, action_url)
+      VALUES (NEW.user_id, 'Goal Milestone', 'Congratulations! Your ' || NEW.name || ' goal is halfway complete.', 'goals', 'success', 'goals', NEW.id, 'low', '/goals');
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_goal_updated ON public.goals;
+CREATE TRIGGER on_goal_updated
+  AFTER UPDATE ON public.goals
+  FOR EACH ROW EXECUTE FUNCTION public.handle_goal_update();
 
 
 -- 18. Enable Realtime for all new tables

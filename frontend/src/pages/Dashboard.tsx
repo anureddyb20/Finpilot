@@ -354,6 +354,86 @@ export function Dashboard() {
     return Math.min(Math.round(score), 100);
   }, [metrics, budgets, goals]);
 
+  const generateDailyAutomations = useCallback(async () => {
+    if (!user || isLoading || transactions.length === 0) return;
+
+    const todayDateStr = new Date().toISOString().split('T')[0];
+    const lastRun = localStorage.getItem(`finpilot_automations_run_${user.id}`);
+    
+    if (lastRun === todayDateStr) return;
+
+    try {
+      let todaySpending = 0;
+      transactions.forEach(t => {
+        if (t.type === 'expense' && t.date === todayDateStr) {
+          todaySpending += Number(t.amount);
+        }
+      });
+      
+      let warnings = budgets.filter(b => b.spent_amount >= b.limit_amount * 0.75).length;
+      const upcomingBills = recurring.filter(r => r.next_due_date && new Date(r.next_due_date).getTime() < Date.now() + 86400000*3).length;
+      
+      const digestDescription = `Balance: ${formatInr(metrics.balance)}\nToday's Spending: ${formatInr(todaySpending)}\nUpcoming Bills: ${upcomingBills}\nBudget Warnings: ${warnings}\nFinancial Health: ${healthScore}`;
+
+      // 1. Insert Digest
+      await supabase.from('notifications').insert({
+        user_id: user.id,
+        title: "Today's Financial Digest",
+        description: digestDescription,
+        category: 'reports',
+        type: 'information',
+        priority: 'medium',
+        action_url: '/dashboard'
+      });
+
+      // 2. Insert Recurring Reminders
+      const overdue = recurring.filter(r => r.next_due_date && new Date(r.next_due_date).getTime() < Date.now());
+      const dueTomorrow = recurring.filter(r => r.next_due_date && new Date(r.next_due_date).getTime() >= Date.now() && new Date(r.next_due_date).getTime() < Date.now() + 86400000 * 2);
+      
+      const notifs = [];
+      for (const r of overdue) {
+        notifs.push({
+          user_id: user.id,
+          title: `Recurring Payment Overdue`,
+          description: `Your ${r.name} is overdue.`,
+          category: 'recurring',
+          type: 'warning',
+          priority: 'high',
+          related_module: 'recurring_payments',
+          related_record_id: r.id,
+          action_url: '/recurring'
+        });
+      }
+      for (const r of dueTomorrow) {
+        notifs.push({
+          user_id: user.id,
+          title: `Recurring Payment Due Soon`,
+          description: `Your ${r.name} is due soon.`,
+          category: 'recurring',
+          type: 'reminder',
+          priority: 'medium',
+          related_module: 'recurring_payments',
+          related_record_id: r.id,
+          action_url: '/recurring'
+        });
+      }
+
+      if (notifs.length > 0) {
+        await supabase.from('notifications').insert(notifs);
+      }
+
+      localStorage.setItem(`finpilot_automations_run_${user.id}`, todayDateStr);
+    } catch (e) {
+      console.error("Error generating daily automations:", e);
+    }
+  }, [user, isLoading, transactions, budgets, recurring, metrics.balance, healthScore]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      generateDailyAutomations();
+    }
+  }, [isLoading, generateDailyAutomations]);
+
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading Dashboard...</div>;
   }

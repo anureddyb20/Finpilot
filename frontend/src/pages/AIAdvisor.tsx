@@ -54,10 +54,41 @@ const aiRecommendations = [
   { id: 3, title: 'Increase SIP', impact: 'High', description: 'Based on your savings rate, you can comfortably increase your mutual fund SIP by ₹1,000/month.' },
 ];
 
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+
 export function AIAdvisor() {
+  const { user } = useAuth();
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState(initialChatMessages);
   const [activeTab, setActiveTab] = useState<'Home' | 'Spending' | 'Coach' | 'Simulator' | 'Purchase'>('Home');
+
+  React.useEffect(() => {
+    const generateAIInsights = async () => {
+      if (!user) return;
+      const todayStr = new Date().toISOString().split('T')[0];
+      const lastRun = localStorage.getItem(`finpilot_ai_run_${user.id}`);
+      if (lastRun === todayStr) return;
+
+      const insightsToInsert = aiRecommendations.map(rec => ({
+        user_id: user.id,
+        title: rec.title,
+        description: rec.description,
+        category: 'ai',
+        type: 'ai_recommendation',
+        priority: rec.impact === 'High' ? 'high' : 'medium',
+        action_url: '/ai-advisor'
+      }));
+
+      try {
+        await supabase.from('notifications').insert(insightsToInsert);
+        localStorage.setItem(`finpilot_ai_run_${user.id}`, todayStr);
+      } catch(e) {
+        console.error(e);
+      }
+    };
+    generateAIInsights();
+  }, [user]);
 
   // Simulator State
   const [simFoodReduction, setSimFoodReduction] = useState(0);

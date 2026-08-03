@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import toast from 'react-hot-toast';
 
 export function PreferencesTab() {
   const { user } = useAuth();

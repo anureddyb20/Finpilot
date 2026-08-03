@@ -84,7 +84,7 @@ export function Transactions() {
     maxAmount: ''
   });
   const [selectedTxnIds, setSelectedTxnIds] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);

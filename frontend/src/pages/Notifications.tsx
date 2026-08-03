@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   Bell, 
   Search, 
@@ -20,119 +20,30 @@ import {
   Clock
 } from 'lucide-react';
 import { cn } from '../components/ui/Button';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
-// -- MOCK DATA --
 type Priority = 'critical' | 'high' | 'medium' | 'low';
 type Category = 'transactions' | 'budgets' | 'goals' | 'recurring' | 'reports' | 'ai' | 'security' | 'achievements' | 'system';
 type Type = 'information' | 'success' | 'warning' | 'critical' | 'achievement' | 'reminder' | 'ai_recommendation';
 
-interface Notification {
+export interface Notification {
   id: string;
+  user_id: string;
   title: string;
   description: string;
-  date: string;
-  time: string;
-  priority: Priority;
   category: Category;
   type: Type;
-  isRead: boolean;
-  isImportant: boolean;
-  isArchived: boolean;
+  related_module: string | null;
+  related_record_id: string | null;
+  priority: Priority;
+  is_read: boolean;
+  is_archived: boolean;
+  action_url: string | null;
+  read_at: string | null;
+  created_at: string;
 }
-
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    title: 'Unknown device attempted login.',
-    description: 'A login attempt was blocked from an unrecognized device in Mumbai. Please review your security settings immediately.',
-    date: 'Today',
-    time: '10:45 AM',
-    priority: 'critical',
-    category: 'security',
-    type: 'critical',
-    isRead: false,
-    isImportant: true,
-    isArchived: false,
-  },
-  {
-    id: '2',
-    title: 'Shopping Budget exceeded by ₹1,200.',
-    description: 'You have spent ₹16,200 on Shopping this month, exceeding your budget of ₹15,000.',
-    date: 'Today',
-    time: '09:30 AM',
-    priority: 'high',
-    category: 'budgets',
-    type: 'warning',
-    isRead: false,
-    isImportant: false,
-    isArchived: false,
-  },
-  {
-    id: '3',
-    title: 'Salary of ₹85,000 received.',
-    description: 'Your monthly salary has been credited to your HDFC Bank account.',
-    date: 'Today',
-    time: '08:00 AM',
-    priority: 'medium',
-    category: 'transactions',
-    type: 'success',
-    isRead: false,
-    isImportant: true,
-    isArchived: false,
-  },
-  {
-    id: '4',
-    title: 'Subscription savings opportunity detected.',
-    description: 'You are paying ₹1,499/mo for 3 streaming services. Consolidating or cancelling one could save you ₹5,988 yearly.',
-    date: 'Yesterday',
-    time: '04:15 PM',
-    priority: 'medium',
-    category: 'ai',
-    type: 'ai_recommendation',
-    isRead: true,
-    isImportant: false,
-    isArchived: false,
-  },
-  {
-    id: '5',
-    title: 'Completed first financial goal.',
-    description: 'Congratulations! You reached your Emergency Fund goal of ₹1,00,000. Keep up the great financial habits.',
-    date: 'Yesterday',
-    time: '01:00 PM',
-    priority: 'medium',
-    category: 'achievements',
-    type: 'achievement',
-    isRead: true,
-    isImportant: true,
-    isArchived: false,
-  },
-  {
-    id: '6',
-    title: 'Electricity bill due in 2 days.',
-    description: 'Your recurring payment for BESCOM (₹2,150) is due on the 23rd.',
-    date: 'Yesterday',
-    time: '10:00 AM',
-    priority: 'medium',
-    category: 'recurring',
-    type: 'reminder',
-    isRead: true,
-    isImportant: false,
-    isArchived: false,
-  },
-  {
-    id: '7',
-    title: 'Monthly report is ready.',
-    description: 'Your detailed financial summary for the previous month is now available for review and download.',
-    date: 'Oct 15',
-    time: '09:00 AM',
-    priority: 'low',
-    category: 'reports',
-    type: 'information',
-    isRead: true,
-    isImportant: false,
-    isArchived: false,
-  }
-];
 
 // Map types to icons and colors
 const getTypeStyles = (type: Type) => {
@@ -155,36 +66,102 @@ const getTypeStyles = (type: Type) => {
   }
 };
 
+const formatDateString = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+const formatTimeString = (dateStr: string) => {
+  return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+};
+
 export function Notifications() {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [statusFilter, setStatusFilter] = useState<'all' | 'unread' | 'read' | 'important' | 'archived'>('all');
   const [categoryFilter, setCategoryFilter] = useState<Category | 'all'>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchNotifications();
+
+    if (!user) return;
+    const subscription = supabase
+      .channel('notifications_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`
+      }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [user, fetchNotifications]);
+
   // Derived stats
-  const unreadCount = notifications.filter(n => !n.isRead && !n.isArchived).length;
-  const todayCount = notifications.filter(n => n.date === 'Today' && !n.isArchived).length;
-  const criticalCount = notifications.filter(n => n.priority === 'critical' && !n.isArchived).length;
-  const aiCount = notifications.filter(n => n.category === 'ai' && !n.isArchived).length;
+  const unreadCount = notifications.filter(n => !n.is_read && !n.is_archived).length;
+  const todayCount = notifications.filter(n => formatDateString(n.created_at) === 'Today' && !n.is_archived).length;
+  const criticalCount = notifications.filter(n => n.priority === 'critical' && !n.is_archived).length;
+  const aiCount = notifications.filter(n => n.category === 'ai' && !n.is_archived).length;
 
   // Filtering Logic
   const filteredNotifications = useMemo(() => {
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
     return notifications.filter(n => {
       // 1. Status Filter
-      if (statusFilter === 'unread' && n.isRead) return false;
-      if (statusFilter === 'read' && !n.isRead) return false;
-      if (statusFilter === 'important' && !n.isImportant) return false;
-      if (statusFilter === 'archived' && !n.isArchived) return false;
-      if (statusFilter !== 'archived' && n.isArchived) return false; // Hide archived by default
+      if (statusFilter === 'unread' && n.is_read) return false;
+      if (statusFilter === 'read' && !n.is_read) return false;
+      if (statusFilter === 'important' && (n.priority !== 'critical' && n.priority !== 'high')) return false;
+      if (statusFilter === 'archived' && !n.is_archived) return false;
+      if (statusFilter !== 'archived' && n.is_archived) return false;
 
       // 2. Category Filter
       if (categoryFilter !== 'all' && n.category !== categoryFilter) return false;
 
-      // 3. Date Filter (simplified for mock data)
-      if (dateFilter === 'today' && n.date !== 'Today') return false;
-      if (dateFilter === 'yesterday' && n.date !== 'Yesterday') return false;
-      // Note: complex date logic omitted for mock
+      // 3. Date Filter
+      const nDate = new Date(n.created_at);
+      if (dateFilter === 'today' && formatDateString(n.created_at) !== 'Today') return false;
+      if (dateFilter === 'yesterday' && formatDateString(n.created_at) !== 'Yesterday') return false;
+      if (dateFilter === 'week' && nDate < startOfWeek) return false;
+      if (dateFilter === 'month' && nDate < startOfMonth) return false;
 
       // 4. Search Filter
       if (searchQuery) {
@@ -197,29 +174,76 @@ export function Notifications() {
       // Critical always at top
       if (a.priority === 'critical' && b.priority !== 'critical') return -1;
       if (b.priority === 'critical' && a.priority !== 'critical') return 1;
-      return 0; // Keeping original order otherwise
+      return 0; // Keeping original order (which is by created_at desc)
     });
   }, [notifications, statusFilter, categoryFilter, dateFilter, searchQuery]);
 
   // Actions
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  const markAllAsRead = async () => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+      if (error) throw error;
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (error) {
+      console.error(error);
+    }
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+  const markAsRead = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (error) {
+      console.error(error);
+    }
   };
 
-  const archive = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isArchived: true } : n));
+  const archive = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_archived: true })
+        .eq('id', id);
+      if (error) throw error;
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_archived: true } : n));
+    } catch (error) {
+      console.error(error);
+    }
   };
 
-  const remove = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const remove = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleActionClick = (notification: Notification) => {
+    if (!notification.is_read) {
+      markAsRead(notification.id);
+    }
+    if (notification.action_url) {
+      navigate(notification.action_url);
+    }
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-8 pb-20">
       
       {/* Header & Top Summary Cards */}
       <div>
@@ -382,14 +406,18 @@ export function Notifications() {
 
           {/* Notifications Feed */}
           <div className="flex-1 overflow-y-auto">
-            {filteredNotifications.length === 0 ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-slate-500">Loading notifications...</div>
+              </div>
+            ) : filteredNotifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                   <CheckCircle2 className="w-10 h-10 text-slate-300" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-2">You're all caught up!</h3>
                 <p className="text-slate-500 text-sm max-w-sm">
-                  No new notifications right now. We'll notify you whenever something important happens.
+                  New financial updates will appear here.
                 </p>
               </div>
             ) : (
@@ -403,11 +431,11 @@ export function Notifications() {
                       key={notification.id} 
                       className={cn(
                         "p-5 hover:bg-slate-50 transition-colors flex gap-4 group relative",
-                        !notification.isRead && "bg-blue-50/30"
+                        !notification.is_read && "bg-blue-50/30"
                       )}
                     >
                       {/* Unread indicator */}
-                      {!notification.isRead && (
+                      {!notification.is_read && (
                         <div className="absolute left-0 top-0 w-1 h-full bg-primary rounded-r"></div>
                       )}
 
@@ -428,7 +456,7 @@ export function Notifications() {
                             </div>
                             <p className="text-sm text-slate-600 mb-2 line-clamp-2">{notification.description}</p>
                             <div className="flex items-center gap-3 text-xs text-slate-400 font-medium">
-                              <span>{notification.date} at {notification.time}</span>
+                              <span>{formatDateString(notification.created_at)} at {formatTimeString(notification.created_at)}</span>
                               <span>•</span>
                               <span className="capitalize">{notification.category}</span>
                             </div>
@@ -436,7 +464,7 @@ export function Notifications() {
                           
                           {/* Quick Actions (Hover) */}
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-white rounded-lg border border-slate-200 shadow-sm p-1">
-                            {!notification.isRead && (
+                            {!notification.is_read && (
                               <button onClick={() => markAsRead(notification.id)} className="p-1.5 text-slate-400 hover:text-primary rounded hover:bg-blue-50 transition-colors" title="Mark as read">
                                 <Check className="w-4 h-4" />
                               </button>
@@ -451,24 +479,18 @@ export function Notifications() {
                         </div>
                         
                         {/* Suggested Action Button (if any) */}
-                        {notification.type === 'ai_recommendation' && (
+                        {notification.action_url && (
                           <div className="mt-3">
-                            <button className="text-xs font-medium px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors">
-                              Review Subscriptions
-                            </button>
-                          </div>
-                        )}
-                        {notification.type === 'warning' && notification.category === 'budgets' && (
-                          <div className="mt-3">
-                            <button className="text-xs font-medium px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors">
-                              Adjust Budget
-                            </button>
-                          </div>
-                        )}
-                        {notification.priority === 'critical' && (
-                          <div className="mt-3">
-                            <button className="text-xs font-bold px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm shadow-red-500/20">
-                              Secure Account Now
+                            <button 
+                              onClick={() => handleActionClick(notification)}
+                              className={cn(
+                                "text-xs font-medium px-3 py-1.5 rounded-lg transition-colors shadow-sm",
+                                notification.priority === 'critical' 
+                                  ? "bg-red-600 text-white hover:bg-red-700 shadow-red-500/20"
+                                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                              )}
+                            >
+                              {notification.priority === 'critical' ? 'Action Required' : 'View Details'}
                             </button>
                           </div>
                         )}

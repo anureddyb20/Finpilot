@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 const formatInr = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {
@@ -358,16 +359,23 @@ export function Reports() {
           <p className="text-slate-500">Understand your financial performance through intelligent reports and visual analytics.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button onClick={() => alert("Report generation scheduled!")} className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2">
+          <button onClick={() => toast.success("Report generation scheduled!")} className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2">
             <Zap className="w-4 h-4" /> Generate Report
           </button>
           <button onClick={handleExportCSV} className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2">
             <Download className="w-4 h-4" /> Export CSV
           </button>
-          <button className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 hidden sm:flex">
+          <button onClick={() => window.print()} className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 hidden sm:flex">
             <Printer className="w-4 h-4" /> Print
           </button>
-          <button className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 hidden sm:flex">
+          <button onClick={() => {
+            if (navigator.share) {
+              navigator.share({ title: 'FinPilot Report', url: window.location.href }).catch(() => toast.error('Share failed'));
+            } else {
+              navigator.clipboard.writeText(window.location.href);
+              toast.success('Link copied to clipboard!');
+            }
+          }} className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2 hidden sm:flex">
             <Share2 className="w-4 h-4" /> Share
           </button>
         </div>
@@ -794,7 +802,7 @@ export function Reports() {
           <Card className="shadow-sm">
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="text-sm">Report History</CardTitle>
-              <button onClick={() => alert("Opening full report history...")} className="text-xs font-bold text-primary hover:underline">View All</button>
+              <button onClick={() => toast("Opening full report history...", { icon: '📂' })} className="text-xs font-bold text-primary hover:underline">View All</button>
             </CardHeader>
             <CardContent className="space-y-2">
               {reportHistory.map(r => (

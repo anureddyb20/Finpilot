@@ -1,61 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { useSettings } from '../../contexts/SettingsContext';
 import toast from 'react-hot-toast';
 
 export function PreferencesTab() {
   const { user } = useAuth();
-  const [settings, setSettings] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { settings, updateSetting } = useSettings();
+  const { settings, updateSetting, saveSettings } = useSettings();
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    async function loadSettings() {
-      if (!user) return;
-      try {
-        const { data, error } = await supabase
-          .from('settings')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-        if (error && error.code !== 'PGRST116') throw error; // ignore no rows
-        
-        if (data) {
-          setSettings(data);
-        } else {
-          // Defaults if not created
-          setSettings({
-            preferred_currency: 'INR',
-            language: 'English',
-            dark_mode: false,
-            notifications: true
-          });
-        }
-      } catch (error) {
-        console.error("Error loading settings:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadSettings();
-  }, [user]);
 
   const handleSave = async () => {
     if (!user || !settings) return;
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('settings')
-        .upsert({
-          user_id: user.id,
-          preferred_currency: settings.preferred_currency,
-          language: settings.language,
-          dark_mode: settings.dark_mode,
-          notifications: settings.notifications
-        }, { onConflict: 'user_id' });
-      
-      if (error) throw error;
+      await saveSettings();
       toast.success("Preferences updated successfully");
     } catch (error) {
       console.error("Error saving settings:", error);
@@ -65,7 +24,7 @@ export function PreferencesTab() {
     }
   };
 
-  if (loading) return <div className="text-slate-500">Loading preferences...</div>;
+  if (!settings) return <div className="text-slate-500 p-8">Loading preferences...</div>;
 
   return (
     <div className="space-y-10">
@@ -77,8 +36,8 @@ export function PreferencesTab() {
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-700">Default Currency</label>
             <select 
-              value={settings?.preferred_currency}
-              onChange={(e) => setSettings({...settings, preferred_currency: e.target.value})}
+              value={settings?.preferred_currency || 'INR'}
+              onChange={(e) => updateSetting('preferred_currency', e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
             >
               <option value="INR">Indian Rupee (₹)</option>
@@ -91,8 +50,8 @@ export function PreferencesTab() {
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-700">Display Language</label>
             <select 
-              value={settings?.language}
-              onChange={(e) => setSettings({...settings, language: e.target.value})}
+              value={settings?.language || 'English'}
+              onChange={(e) => updateSetting('language', e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
             >
               <option value="English">English</option>
@@ -118,7 +77,7 @@ export function PreferencesTab() {
               name="theme" 
               className="peer sr-only" 
               checked={!settings?.dark_mode} 
-              onChange={() => setSettings({...settings, dark_mode: false})} 
+              onChange={() => updateSetting('dark_mode', false)} 
             />
             <div className="p-4 border-2 border-slate-100 rounded-xl peer-checked:border-primary peer-checked:bg-blue-50 transition-all text-center">
               <div className="w-12 h-12 bg-white border border-slate-200 rounded-full mx-auto mb-2 flex items-center justify-center">☀️</div>
@@ -131,7 +90,7 @@ export function PreferencesTab() {
               name="theme" 
               className="peer sr-only" 
               checked={settings?.dark_mode}
-              onChange={() => setSettings({...settings, dark_mode: true})} 
+              onChange={() => updateSetting('dark_mode', true)} 
             />
             <div className="p-4 border-2 border-slate-100 rounded-xl peer-checked:border-primary peer-checked:bg-blue-50 transition-all text-center">
               <div className="w-12 h-12 bg-slate-900 rounded-full mx-auto mb-2 flex items-center justify-center">🌙</div>
@@ -156,7 +115,7 @@ export function PreferencesTab() {
               type="checkbox" 
               className="sr-only peer" 
               checked={settings?.notifications}
-              onChange={(e) => setSettings({...settings, notifications: e.target.checked})}
+              onChange={(e) => updateSetting('notifications', e.target.checked)}
             />
             <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
           </label>

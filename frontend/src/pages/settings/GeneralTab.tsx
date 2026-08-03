@@ -64,10 +64,6 @@ export function GeneralTab() {
     }
   };
 
-  if (loading) {
-    return <div className="text-slate-500">Loading profile...</div>;
-  }
-
   return (
     <div className="space-y-10">
       {/* Personalization Section */}

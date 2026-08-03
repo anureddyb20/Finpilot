@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String
+  fullName     String?
+  profilePhoto String?
+  country      String?
+  currency     String    @default("INR")
+  language     String    @default("en")
+  theme        String    @default("light")
+  createdAt    DateTime  @default(now())
+
+  settings           Setting?
+  transactions       Transaction[]
+  budgets            Budget[]
+  goals              Goal[]
+  recurringPayments  RecurringPayment[]
+  notifications      Notification[]
+}
+
+model Setting {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @unique @db.Uuid
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications     Boolean  @default(true)
+  darkMode          Boolean  @default(false)
+  preferredCurrency String   @default("INR")
+  language          String   @default("en")
+}
+
+model Transaction {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String // 'income', 'expense', 'transfer', 'refund'
+  category    String
+  amount      Decimal  @db.Decimal(15, 2)
+  date        DateTime @db.Date
+  time        DateTime @db.Time
+  merchant    String
+  method      String
+  notes       String?
+  tags        String[]
+  receiptUrl  String?
+  location    String?
+  status      String   @default("Completed")
+  
+  goalId      String?  @db.Uuid
+  goal        Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  deletedAt   DateTime?
+}
+
+model Budget {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String?
+  category      String
+  limitAmount   Decimal  @db.Decimal(15, 2)
+  spentAmount   Decimal  @default(0) @db.Decimal(15, 2)
+  month         Int
+  year          Int
+  startDate     DateTime? @db.Date
+  endDate       DateTime? @db.Date
+  alertThreshold Int     @default(75)
+  notes         String?
+  status        String   @default("Active")
+  color         String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+}
+
+model Goal {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @db.Uuid
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  category            String?
+  targetAmount        Decimal  @db.Decimal(15, 2)
+  savedAmount         Decimal  @default(0) @db.Decimal(15, 2)
+  monthlyContribution Decimal  @default(0) @db.Decimal(15, 2)
+  startDate           DateTime? @db.Date
+  targetDate          DateTime? @db.Date
+  iconName            String   @default("Target")
+  colorTheme          String   @default("blue")
+  priority            String   @default("Medium")
+  status              String   @default("In Progress")
+  notes               String?
+
+  transactions        Transaction[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now()) @updatedAt
+}
+
+model RecurringPayment {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @db.Uuid
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  amount          Decimal  @db.Decimal(15, 2)
+  dueDate         Int      // Day of the month
+  nextDueDate     DateTime? @db.Date
+  category        String
+  frequency       String   @default("Monthly")
+  paymentMethod   String?
+  merchant        String?
+  isUrgent        Boolean  @default(false)
+  autoPay         Boolean  @default(false)
+  reminderDays    Int      @default(3)
+  status          String   @default("Active")
+  colorTheme      String?
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+}
+
+model Notification {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @db.Uuid
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title             String
+  description       String
+  category          String
+  type              String   @default("information")
+  relatedModule     String?
+  relatedRecordId   String?  @db.Uuid
+  priority          String   @default("low")
+  isRead            Boolean  @default(false)
+  isArchived        Boolean  @default(false)
+  actionUrl         String?
+  readAt            DateTime?
+
+  createdAt         DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  action    String
+  entity    String
+  entityId  String?
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+

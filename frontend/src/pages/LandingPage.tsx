@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { ArrowRight, BarChart3, PieChart, Shield, Sparkles, Target, Zap } from 'lucide-react';
 import { Button } from '../components/ui/Button';
@@ -33,7 +34,7 @@ export function LandingPage() {
           <div className="flex items-center gap-4">
             <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900">Sign In</Link>
             <Link to="/signup">
-              <Button size="sm">Get Started</Button>
+              <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  size="sm">Get Started</Button>
             </Link>
           </div>
         </div>
@@ -60,11 +61,11 @@ export function LandingPage() {
           </motion.p>
           <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link to="/signup">
-              <Button size="lg" className="w-full sm:w-auto gap-2">
+              <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  size="lg" className="w-full sm:w-auto gap-2">
                 Start for Free <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="w-full sm:w-auto">
+            <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  size="lg" variant="outline" className="w-full sm:w-auto">
               View Demo
             </Button>
           </motion.div>

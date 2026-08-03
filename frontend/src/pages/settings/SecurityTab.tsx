@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/Button';
 import { ShieldCheck, Smartphone, Laptop, Key, History } from 'lucide-react';
 
@@ -15,7 +16,7 @@ export function SecurityTab() {
             <h3 className="text-xl font-bold text-slate-900">Your account is highly secure</h3>
             <p className="text-slate-600 text-sm mt-1">Security Score: 95/100. All critical security measures are enabled.</p>
           </div>
-          <Button variant="outline" className="shrink-0 border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+          <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  variant="outline" className="shrink-0 border-emerald-200 text-emerald-700 hover:bg-emerald-100">
             View Security Audit
           </Button>
         </div>
@@ -26,7 +27,7 @@ export function SecurityTab() {
             <p className="text-sm font-medium text-slate-900">Authenticator App</p>
             <p className="text-xs text-slate-500">Configured to receive codes via Google Authenticator.</p>
           </div>
-          <Button variant="outline" size="sm">Manage</Button>
+          <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  variant="outline" size="sm">Manage</Button>
         </div>
       </section>
 
@@ -55,7 +56,7 @@ export function SecurityTab() {
                 </div>
               </div>
             </div>
-            <Button variant="outline" size="sm">Update</Button>
+            <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  variant="outline" size="sm">Update</Button>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between p-4 border border-slate-200 rounded-xl">
@@ -84,7 +85,7 @@ export function SecurityTab() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-slate-900">Active Devices</h3>
-          <button className="text-sm text-red-600 font-medium hover:underline">Logout from all devices</button>
+          <button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  className="text-sm text-red-600 font-medium hover:underline">Logout from all devices</button>
         </div>
         
         <div className="space-y-3">
@@ -93,23 +94,14 @@ export function SecurityTab() {
               <Laptop className="w-6 h-6 text-slate-400" />
               <div>
                 <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
-                  MacBook Pro (Current)
+                  {navigator.userAgent.includes("Mac") ? "macOS Device" : navigator.userAgent.includes("Win") ? "Windows PC" : navigator.userAgent.includes("Linux") ? "Linux Device" : "Mobile Device"} (Current)
                   <span className="bg-emerald-100 text-emerald-700 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase">Active</span>
                 </p>
-                <p className="text-xs text-slate-500">Bengaluru, India • Chrome • IP: 192.168.1.1</p>
+                <p className="text-xs text-slate-500">
+                  {Intl.DateTimeFormat().resolvedOptions().timeZone} • {navigator.userAgent.includes("Chrome") ? "Chrome" : navigator.userAgent.includes("Firefox") ? "Firefox" : navigator.userAgent.includes("Safari") ? "Safari" : "Browser"} • IP: Automatically detected by server
+                </p>
               </div>
             </div>
-          </div>
-          
-          <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
-            <div className="flex items-center gap-4">
-              <Smartphone className="w-6 h-6 text-slate-400" />
-              <div>
-                <p className="text-sm font-medium text-slate-900">iPhone 14 Pro</p>
-                <p className="text-xs text-slate-500">Mumbai, India • FinPilot iOS App • Yesterday, 2:30 PM</p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" className="text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50">Revoke</Button>
           </div>
         </div>
       </section>

@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
@@ -283,7 +284,7 @@ export function Transactions() {
           <p className="text-slate-500">Manage, categorize, and track all your financial activities.</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2">
+          <button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2">
             <FileDown className="w-4 h-4" /> Export
           </button>
           <button onClick={() => setIsAddModalOpen(true)} className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2">
@@ -371,7 +372,7 @@ export function Transactions() {
             <div className="bg-blue-50 px-6 py-3 flex items-center justify-between border-b border-blue-100">
               <span className="text-sm font-medium text-blue-700">{selectedTxnIds.length} selected</span>
               <div className="flex gap-2">
-                <button className="text-sm px-3 py-1.5 bg-white border border-blue-200 text-blue-700 rounded hover:bg-blue-100 transition-colors">Edit Category</button>
+                <button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  className="text-sm px-3 py-1.5 bg-white border border-blue-200 text-blue-700 rounded hover:bg-blue-100 transition-colors">Edit Category</button>
                 <button onClick={handleDeleteSelected} className="text-sm px-3 py-1.5 bg-red-100 border border-red-200 text-red-700 rounded hover:bg-red-200 transition-colors flex items-center gap-1">
                   <Trash2 className="w-4 h-4"/> Delete
                 </button>

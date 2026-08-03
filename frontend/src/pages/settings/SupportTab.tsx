@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { Button } from '../../components/ui/Button';
 import { HelpCircle, MessageSquare, Bug, Lightbulb, FileText, RefreshCw, Zap } from 'lucide-react';
 
@@ -15,7 +16,7 @@ export function SupportTab() {
             { label: 'Export Data', icon: Zap },
             { label: 'Contact Support', icon: Zap },
           ].map((item, i) => (
-            <button key={i} className="flex flex-col items-center gap-2 p-4 border border-slate-200 rounded-xl hover:border-primary hover:bg-blue-50 transition-all">
+            <button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  key={i} className="flex flex-col items-center gap-2 p-4 border border-slate-200 rounded-xl hover:border-primary hover:bg-blue-50 transition-all">
               <item.icon className="w-5 h-5 text-primary" />
               <span className="text-xs font-medium text-slate-700">{item.label}</span>
             </button>
@@ -128,7 +129,7 @@ export function SupportTab() {
                 <p className="text-xs text-slate-500">Revert theme, notifications, and AI settings to default.</p>
               </div>
             </div>
-            <Button variant="outline" size="sm">Reset</Button>
+            <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  variant="outline" size="sm">Reset</Button>
           </div>
           
           <div className="flex items-center justify-between p-4 border border-red-100 bg-red-50 rounded-xl">
@@ -139,7 +140,7 @@ export function SupportTab() {
                 <p className="text-xs text-red-600">Reset the entire application settings (Data is preserved).</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" className="border-red-200 text-red-700 hover:bg-red-100">Factory Reset</Button>
+            <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  variant="outline" size="sm" className="border-red-200 text-red-700 hover:bg-red-100">Factory Reset</Button>
           </div>
         </div>
       </section>

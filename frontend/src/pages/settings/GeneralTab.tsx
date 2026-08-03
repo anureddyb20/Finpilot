@@ -102,7 +102,7 @@ export function GeneralTab() {
               <p className="text-xs text-slate-500">Complete your profile to unlock better AI recommendations.</p>
             </div>
           </div>
-          <Button variant="outline" size="sm">Complete Now</Button>
+          <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  variant="outline" size="sm">Complete Now</Button>
         </div>
       </section>
 

@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -43,7 +44,7 @@ export function ForgotPassword() {
             We've sent a password reset link to <strong>{email}</strong>.
           </p>
           <Link to="/login">
-            <Button className="w-full">Return to Login</Button>
+            <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  className="w-full">Return to Login</Button>
           </Link>
         </div>
       </div>

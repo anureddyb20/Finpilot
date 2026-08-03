@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
@@ -204,7 +205,7 @@ export function AIAdvisor() {
         {/* Chat Input */}
         <div className="p-4 bg-white border-t border-slate-100">
           <form onSubmit={handleSendMessage} className="relative flex items-center">
-            <button type="button" className="absolute left-3 p-1.5 text-slate-400 hover:text-indigo-600 transition-colors bg-slate-50 rounded-full">
+            <button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  type="button" className="absolute left-3 p-1.5 text-slate-400 hover:text-indigo-600 transition-colors bg-slate-50 rounded-full">
               <Mic className="w-4 h-4" />
             </button>
             <input 

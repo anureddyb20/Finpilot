@@ -15,6 +15,7 @@ import { Notifications } from './pages/Notifications';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { AuthProvider } from './contexts/AuthContext';
+import { SettingsProvider } from './contexts/SettingsContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 // Main Application Router
@@ -23,35 +24,37 @@ import { Toaster } from 'react-hot-toast';
 function App() {
   return (
     <AuthProvider>
-      <Toaster position="bottom-right" toastOptions={{ duration: 4000, style: { background: '#334155', color: '#fff', borderRadius: '12px', fontSize: '14px', fontWeight: 500 } }} />
-      <Router>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          
-          {/* Public Auth Routes (Redirect to dashboard if already logged in) */}
-          <Route element={<ProtectedRoute requireAuth={false} />}>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-          </Route>
-          
-          {/* Protected Dashboard Routes */}
-          <Route element={<ProtectedRoute requireAuth={true} />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/transactions" element={<Transactions />} />
-              <Route path="/budgets" element={<Budgets />} />
-              <Route path="/goals" element={<Goals />} />
-              <Route path="/recurring" element={<RecurringPayments />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/ai-advisor" element={<AIAdvisor />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/notifications" element={<Notifications />} />
+      <SettingsProvider>
+        <Toaster position="bottom-right" toastOptions={{ duration: 4000, style: { background: '#334155', color: '#fff', borderRadius: '12px', fontSize: '14px', fontWeight: 500 } }} />
+        <Router>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            
+            {/* Public Auth Routes (Redirect to dashboard if already logged in) */}
+            <Route element={<ProtectedRoute requireAuth={false} />}>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
             </Route>
-          </Route>
-        </Routes>
-      </Router>
+            
+            {/* Protected Dashboard Routes */}
+            <Route element={<ProtectedRoute requireAuth={true} />}>
+              <Route element={<DashboardLayout />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/transactions" element={<Transactions />} />
+                <Route path="/budgets" element={<Budgets />} />
+                <Route path="/goals" element={<Goals />} />
+                <Route path="/recurring" element={<RecurringPayments />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/ai-advisor" element={<AIAdvisor />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/notifications" element={<Notifications />} />
+              </Route>
+            </Route>
+          </Routes>
+        </Router>
+      </SettingsProvider>
     </AuthProvider>
   );
 }

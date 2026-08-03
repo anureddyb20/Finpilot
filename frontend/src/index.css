@@ -6,6 +6,67 @@
 
 @layer base {
   body {
-    @apply bg-background text-slate-900 font-sans antialiased;
+    @apply bg-background text-slate-900 font-sans antialiased transition-colors duration-300;
   }
+}
+
+/* Robust Dark Mode Implementation */
+.dark body {
+  background-color: #020617 !important; /* slate-950 */
+  color: #f8fafc !important; /* slate-50 */
+}
+
+.dark .bg-background {
+  background-color: #020617 !important; 
+}
+
+.dark .bg-white {
+  background-color: #0f172a !important; /* slate-900 */
+  border-color: #1e293b !important; /* slate-800 */
+}
+
+.dark .bg-slate-50 {
+  background-color: #1e293b !important; /* slate-800 */
+}
+
+.dark .bg-slate-100 {
+  background-color: #334155 !important; /* slate-700 */
+}
+
+/* Borders */
+.dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-300 {
+  border-color: #1e293b !important;
+}
+
+/* Text */
+.dark .text-slate-900, .dark .text-slate-800 {
+  color: #f8fafc !important; 
+}
+
+.dark .text-slate-700 {
+  color: #e2e8f0 !important; 
+}
+
+.dark .text-slate-600 {
+  color: #cbd5e1 !important; 
+}
+
+.dark .text-slate-500 {
+  color: #94a3b8 !important; 
+}
+
+/* Ensure Sidebar stays dark and doesn't get messed up if it uses slate-900 */
+/* The sidebar is likely bg-slate-900 or bg-slate-950, which doesn't get touched by above because we only override bg-white, bg-slate-50, etc. */
+
+/* Shadows */
+.dark .shadow-sm, .dark .shadow-md, .dark .shadow-lg, .dark .shadow-xl {
+  box-shadow: none !important;
+  border: 1px solid #1e293b !important;
+}
+
+/* Specific elements like dropdowns or selects that might need background fix */
+.dark select, .dark input {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
 }

@@ -10,9 +10,8 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area 
 } from 'recharts';
 
-import { useAuth } from '../contexts/AuthContext';
 import { FinancialEngine } from '../lib/engine';
-
+import { useAuth } from '../contexts/AuthContext';
 const formatInr = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -23,9 +22,16 @@ const formatInr = (amount: number) => {
 };
 
 export function AIAdvisor() {
+  const { user } = useAuth();
   
   // Data from engine
   const store = FinancialEngine.getStore()();
+
+  useEffect(() => {
+    if (user && !store.isInitialized && !store.isLoading) {
+      store.initialize(user.id);
+    }
+  }, [user, store]);
   
   const health = FinancialEngine.getHealthScore();
   const spending = FinancialEngine.getSpendingAnalysis();
@@ -292,7 +298,7 @@ export function AIAdvisor() {
                 </CardHeader>
                 <CardContent className="pt-4 space-y-3">
                   {advice.map((rec, idx) => (
-                    <div key={idx} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100">
+                    <div key={idx} onClick={() => setChatInput(rec)} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100 cursor-pointer">
                       <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 bg-amber-500`}></div>
                       <div>
                         <h4 className="font-bold text-slate-900 text-sm mb-1">AI Coach</h4>
@@ -301,7 +307,7 @@ export function AIAdvisor() {
                     </div>
                   ))}
                   {health.improvementSuggestions.map((rec, idx) => (
-                    <div key={`health-${idx}`} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100">
+                    <div key={`health-${idx}`} onClick={() => setChatInput(rec)} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100 cursor-pointer">
                       <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 bg-blue-500`}></div>
                       <div>
                         <h4 className="font-bold text-slate-900 text-sm mb-1">Health Goal</h4>

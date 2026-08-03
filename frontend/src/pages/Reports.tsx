@@ -612,7 +612,7 @@ export function Reports() {
               </ul>
             </div>
           </div>
-          <button className="w-full mt-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-md">
+          <button onClick={() => toast.success("Generating full AI story...")} className="w-full mt-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-md">
             View Full AI Story
           </button>
         </div>

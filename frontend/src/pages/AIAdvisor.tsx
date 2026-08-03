@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { 
-  Bot, Send, Mic, Sparkles, TrendingUp, TrendingDown, 
+  Bot, Send, Mic, Sparkles, TrendingDown, 
   Target, Target as TargetIcon, Zap, Activity, AlertTriangle, AlertCircle, CheckCircle2,
   PieChart as PieChartIcon, Smartphone, CreditCard, HeartPulse
 } from 'lucide-react';
@@ -10,112 +10,114 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area 
 } from 'recharts';
 
+import { useAuth } from '../contexts/AuthContext';
+import { FinancialEngine } from '../lib/engine';
+
 const formatInr = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
-  }).format(amount);
+  }).format(amount || 0);
 };
 
-// --- Mock Data ---
-
-const initialChatMessages = [
-  { id: 1, sender: 'ai', text: 'Good Evening, Anu! I am your AI Financial Advisor. I have analyzed your finances for this month and generated today\'s recommendations. What would you like to focus on today?', time: '18:30' },
-  { id: 2, sender: 'user', text: 'How much did I spend this month?', time: '18:32' },
-  { id: 3, sender: 'ai', text: 'You have spent ₹49,000 so far this month. Your highest spending category is Rent (₹18,000), followed by Food (₹12,500). Your food expenses have actually decreased by 9% compared to last month!', time: '18:32' },
-];
-
-const quickQuestions = [
-  'Analyze My Spending', 'Budget Review', 'Savings Suggestions', 
-  'Investment Advice', 'Financial Health', 'Can I afford a ₹65,000 laptop?'
-];
-
-const spendingTrendsData = [
-  { day: 'Mon', amount: 1200 },
-  { day: 'Tue', amount: 950 },
-  { day: 'Wed', amount: 800 },
-  { day: 'Thu', amount: 2100 },
-  { day: 'Fri', amount: 3500 },
-  { day: 'Sat', amount: 5200 },
-  { day: 'Sun', amount: 4800 },
-];
-
-const budgetCoachData = [
-  { category: 'Food', used: 82, status: 'Warning', msg: 'You are close to exceeding this budget. Expected month-end spend is ₹16,000 against a budget of ₹15,000.' },
-  { category: 'Shopping', used: 141, status: 'Danger', msg: 'Budget exceeded by ₹2,500. Delay unnecessary shopping until next salary.' },
-  { category: 'Travel', used: 45, status: 'Safe', msg: 'Great job! You are well within limits.' }
-];
-
-const aiRecommendations = [
-  { id: 1, title: 'Reduce Dining Expenses', impact: 'High', description: 'Reduce dining out by ₹2,000 to stay within your overall monthly limit.' },
-  { id: 2, title: 'Move Surplus to Emergency Fund', impact: 'Medium', description: 'Your travel budget has ₹3,000 surplus. Consider moving it to your Emergency Fund.' },
-  { id: 3, title: 'Increase SIP', impact: 'High', description: 'Based on your savings rate, you can comfortably increase your mutual fund SIP by ₹1,000/month.' },
-];
-
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-
 export function AIAdvisor() {
-  const { user } = useAuth();
+  
+  // Data from engine
+  const store = FinancialEngine.getStore()();
+  
+  const health = FinancialEngine.getHealthScore();
+  const spending = FinancialEngine.getSpendingAnalysis();
+  const savings = FinancialEngine.getSavingsAnalysis();
+  const budgetIntel = FinancialEngine.getBudgetIntelligence();
+  const goalForecast = FinancialEngine.getGoalForecast();
+  const digest = FinancialEngine.getTodayDigest();
+  const advice = FinancialEngine.getCoachAdvice();
+
+  // Chat State
   const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState(initialChatMessages);
+  const [messages, setMessages] = useState([
+    { id: 1, sender: 'ai', text: `Good Evening! I am your AI Financial Advisor. Your current health score is ${health.score}/100. ${digest.topAdvice} What would you like to focus on today?`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+  ]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   const [activeTab, setActiveTab] = useState<'Home' | 'Spending' | 'Coach' | 'Simulator' | 'Purchase'>('Home');
-
-  React.useEffect(() => {
-    const generateAIInsights = async () => {
-      if (!user) return;
-      const todayStr = new Date().toISOString().split('T')[0];
-      const lastRun = localStorage.getItem(`finpilot_ai_run_${user.id}`);
-      if (lastRun === todayStr) return;
-
-      const insightsToInsert = aiRecommendations.map(rec => ({
-        user_id: user.id,
-        title: rec.title,
-        description: rec.description,
-        category: 'ai',
-        type: 'ai_recommendation',
-        priority: rec.impact === 'High' ? 'high' : 'medium',
-        action_url: '/ai-advisor'
-      }));
-
-      try {
-        await supabase.from('notifications').insert(insightsToInsert);
-        localStorage.setItem(`finpilot_ai_run_${user.id}`, todayStr);
-      } catch(e) {
-        console.error(e);
-      }
-    };
-    generateAIInsights();
-  }, [user]);
 
   // Simulator State
   const [simFoodReduction, setSimFoodReduction] = useState(0);
   const [simExtraInvestment, setSimExtraInvestment] = useState(0);
   const [simSalaryIncrease, setSimSalaryIncrease] = useState(0);
+  
+  const simulation = FinancialEngine.simulateWhatIf({
+    reduceExpensesBy: simFoodReduction,
+    extraGoalContribution: simExtraInvestment,
+    salaryIncrease: simSalaryIncrease
+  });
 
   // Purchase Advisor State
   const [purchaseItem, setPurchaseItem] = useState('');
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [purchaseResult, setPurchaseResult] = useState<any>(null);
 
+  const quickQuestions = [
+    'Analyze My Spending', 'Budget Review', 'Savings Suggestions', 
+    'Investment Advice', 'Financial Health', 'Can I afford a ₹65,000 laptop?'
+  ];
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
+    const query = chatInput.trim().toLowerCase();
     const newMsg = { id: Date.now(), sender: 'user', text: chatInput, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
     setMessages(prev => [...prev, newMsg]);
     setChatInput('');
 
-    // Simulate AI response
+    // Generate AI response based on real data
     setTimeout(() => {
+      let responseText = "";
+      
+      if (query.includes('spend')) {
+        responseText = `You have spent ${formatInr(spending.monthly)} this month. Your highest spending category is ${spending.topCategory?.name || 'Unknown'} (${formatInr(spending.topCategory?.amount || 0)}).`;
+      } else if (query.includes('budget')) {
+        if (budgetIntel.exceededCount > 0) {
+          responseText = `You have exceeded ${budgetIntel.exceededCount} budgets this month. Your most concerning category is ${budgetIntel.exceededBudgets[0]?.category}.`;
+        } else {
+          responseText = `Great job! You are staying within all your budgets.`;
+        }
+      } else if (query.includes('sav')) {
+        responseText = `Your current savings rate is ${Math.round(savings.savingsRate)}%. ${savings.suggestions[0]}`;
+      } else if (query.includes('health')) {
+        responseText = `Your financial health score is ${health.score}/100. ${health.reasons[0] || 'Keep up the good work.'}`;
+      } else if (query.includes('afford') || query.match(/\d+/)) {
+        const amountMatch = query.match(/\d+/g);
+        if (amountMatch) {
+            const amount = Number(amountMatch.join(''));
+            if (amount > savings.totalSavings) {
+                responseText = `A purchase of ${formatInr(amount)} exceeds your current monthly savings of ${formatInr(savings.totalSavings)}. You would need to dip into past savings or wait.`;
+            } else {
+                responseText = `Yes, you can afford ${formatInr(amount)} as it fits within your monthly surplus of ${formatInr(savings.totalSavings)}.`;
+            }
+        } else {
+            responseText = `Please tell me the exact amount of the item you want to purchase in the Purchase Advisor tab!`;
+        }
+      } else if (query.includes('invest')) {
+        responseText = `Based on your profile, you should ensure your Emergency Fund is fully funded first. You have ${formatInr(savings.totalSavings)} available for investments this month.`;
+      } else {
+        responseText = advice[Math.floor(Math.random() * advice.length)] || "I'm analyzing your data. Check the tabs on the right for deep insights!";
+      }
+
       setMessages(prev => [...prev, {
         id: Date.now(), sender: 'ai', 
-        text: `Based on your recent transactions, that's an interesting question. Let me pull up your data... (This is a mock response to "${newMsg.text}")`, 
+        text: responseText, 
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }]);
-    }, 1500);
+    }, 600);
   };
 
   const simulatePurchase = (e: React.FormEvent) => {
@@ -123,20 +125,29 @@ export function AIAdvisor() {
     if (!purchaseItem || !purchaseAmount) return;
     
     const amt = Number(purchaseAmount);
-    if (amt > 80000) {
-      setPurchaseResult({ status: 'High Risk', text: 'This purchase will consume a large portion of your savings and might delay your Emergency Fund goal by 3 months. Consider saving for it over the next 4 months instead.' });
-    } else if (amt > 30000) {
-      setPurchaseResult({ status: 'Moderate Risk', text: 'You can afford this, but it will reduce your monthly surplus significantly. Ensure you have no upcoming large bills before proceeding.' });
+    if (amt > savings.totalSavings * 3) {
+      setPurchaseResult({ status: 'High Risk', text: `This purchase (${formatInr(amt)}) will consume a large portion of your savings. Consider saving for it over the next several months.` });
+    } else if (amt > savings.totalSavings) {
+      setPurchaseResult({ status: 'Moderate Risk', text: `You can afford this, but it exceeds your monthly surplus of ${formatInr(savings.totalSavings)}. It will dip into your reserves.` });
     } else {
-      setPurchaseResult({ status: 'Affordable', text: 'You have enough surplus in your budget this month. This purchase won\'t impact your long-term goals.' });
+      setPurchaseResult({ status: 'Affordable', text: `You have enough surplus (${formatInr(savings.totalSavings)}) in your budget this month. This purchase won't impact your long-term goals.` });
     }
   };
 
-  // Base values for Simulator
-  const baseSavings = 36000;
-  const baseScore = 86;
-  const simulatedSavings = baseSavings + simFoodReduction - simExtraInvestment + simSalaryIncrease;
-  const simulatedScore = Math.min(100, baseScore + (simFoodReduction > 0 ? 2 : 0) + (simExtraInvestment > 0 ? 3 : 0));
+  if (store.isLoading || !store.isInitialized) {
+    return <div className="p-8 flex justify-center"><div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full"></div></div>;
+  }
+
+  // Generate spending trend for AreaChart (last 7 days)
+  const last7Days = Array.from({length: 7}, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const dayStr = d.toLocaleDateString('en-US', { weekday: 'short' });
+    const amount = store.transactions
+        .filter(t => t.type === 'expense' && new Date(t.date).toDateString() === d.toDateString())
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+    return { day: dayStr, amount };
+  });
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)] pb-10">
@@ -169,6 +180,7 @@ export function AIAdvisor() {
               <span className="text-[10px] text-slate-400 font-medium mt-1 mx-1">{msg.time}</span>
             </div>
           ))}
+          <div ref={messagesEndRef} />
           
           {/* Quick Questions Chips */}
           <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-100/50">
@@ -235,22 +247,21 @@ export function AIAdvisor() {
                 <div className="absolute right-0 top-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
                 <div className="relative z-10 flex flex-col md:flex-row justify-between gap-6 items-start md:items-center">
                   <div>
-                    <h2 className="text-2xl font-black mb-1">Good Evening, Anu.</h2>
+                    <h2 className="text-2xl font-black mb-1">Good Evening.</h2>
                     <p className="text-indigo-200 text-sm font-medium mb-4">I've analyzed your finances and generated today's report.</p>
                     <div className="flex gap-4 items-center bg-white/10 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/5 inline-flex">
                       <HeartPulse className="w-5 h-5 text-emerald-400" />
                       <div>
                         <p className="text-xs text-indigo-200 font-bold uppercase tracking-wider">Health Score</p>
-                        <p className="text-xl font-black">82<span className="text-sm text-indigo-300">/100</span></p>
+                        <p className="text-xl font-black">{health.score}<span className="text-sm text-indigo-300">/100</span></p>
                       </div>
                     </div>
                   </div>
                   <div className="bg-white/5 rounded-xl p-4 border border-white/10 w-full md:w-auto">
                     <p className="text-xs text-indigo-300 font-bold uppercase tracking-wider mb-3 flex items-center gap-2"><Zap className="w-3 h-3 text-amber-400"/> Quick Summary</p>
                     <ul className="space-y-2 text-sm font-medium">
-                      <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400"/> Saved {formatInr(18200)} this month.</li>
-                      <li className="flex items-center gap-2"><TrendingDown className="w-4 h-4 text-emerald-400"/> Food spending down 9%.</li>
-                      <li className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-red-400"/> Shopping increased by 12%.</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400"/> Saved {formatInr(savings.totalSavings)} this month.</li>
+                      <li className="flex items-center gap-2"><TrendingDown className="w-4 h-4 text-emerald-400"/> {spending.topCategory?.name || 'Top'} spending is {formatInr(spending.topCategory?.amount || 0)}.</li>
                     </ul>
                   </div>
                 </div>
@@ -259,10 +270,10 @@ export function AIAdvisor() {
               {/* Snapshot Row */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: 'Balance', value: formatInr(120000), trend: '+2%' },
-                  { label: 'Income', value: formatInr(85000), trend: 'stable' },
-                  { label: 'Expenses', value: formatInr(49000), trend: '+12%' },
-                  { label: 'Savings', value: formatInr(36000), trend: '-5%' }
+                  { label: 'Income', value: formatInr(store.transactions.filter(t => t.type==='income').reduce((a,b)=>a+Number(b.amount),0)) },
+                  { label: 'Expenses', value: formatInr(spending.monthly) },
+                  { label: 'Savings', value: formatInr(savings.totalSavings) },
+                  { label: 'Savings Rate', value: `${Math.round(savings.savingsRate)}%` }
                 ].map((item, i) => (
                   <Card key={i} className="shadow-sm border-slate-100">
                     <CardContent className="p-4">
@@ -280,12 +291,21 @@ export function AIAdvisor() {
                   <CardTitle>Top AI Recommendations</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4 space-y-3">
-                  {aiRecommendations.map(rec => (
-                    <div key={rec.id} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100">
-                      <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${rec.impact === 'High' ? 'bg-red-500' : 'bg-amber-500'}`}></div>
+                  {advice.map((rec, idx) => (
+                    <div key={idx} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100">
+                      <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 bg-amber-500`}></div>
                       <div>
-                        <h4 className="font-bold text-slate-900 text-sm mb-1">{rec.title} <span className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-500 ml-2">{rec.impact} Impact</span></h4>
-                        <p className="text-xs text-slate-600 font-medium leading-relaxed">{rec.description}</p>
+                        <h4 className="font-bold text-slate-900 text-sm mb-1">AI Coach</h4>
+                        <p className="text-xs text-slate-600 font-medium leading-relaxed">{rec}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {health.improvementSuggestions.map((rec, idx) => (
+                    <div key={`health-${idx}`} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100">
+                      <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 bg-blue-500`}></div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm mb-1">Health Goal</h4>
+                        <p className="text-xs text-slate-600 font-medium leading-relaxed">{rec}</p>
                       </div>
                     </div>
                   ))}
@@ -298,12 +318,12 @@ export function AIAdvisor() {
             <motion.div key="spending" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
               <Card className="shadow-sm">
                 <CardHeader>
-                  <CardTitle>Daily Spending Patterns</CardTitle>
+                  <CardTitle>Last 7 Days Spending Patterns</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[250px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={spendingTrendsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <AreaChart data={last7Days} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3}/>
@@ -321,7 +341,7 @@ export function AIAdvisor() {
                   <div className="mt-6 bg-indigo-50 p-4 rounded-xl flex gap-3 items-start border border-indigo-100">
                     <AlertCircle className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
                     <p className="text-sm font-medium text-indigo-900 leading-relaxed">
-                      Your weekend spending (<strong className="font-black">{formatInr(10000)}</strong>) is significantly higher than weekdays. A large portion of this goes to dining out. Consider setting a specific weekend budget.
+                      Your weekend spending (<strong className="font-black">{formatInr(spending.weekendVsWeekday.weekend)}</strong>) vs weekday spending (<strong className="font-black">{formatInr(spending.weekendVsWeekday.weekday)}</strong>). {spending.weekendVsWeekday.weekend > spending.weekendVsWeekday.weekday ? "Consider setting a specific weekend budget." : "Your spending is mostly on weekdays."}
                     </p>
                   </div>
                 </CardContent>
@@ -333,41 +353,49 @@ export function AIAdvisor() {
             <motion.div key="coach" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
               <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2"><TargetIcon className="w-5 h-5 text-blue-500" /> Budget Coach</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {budgetCoachData.map((b, i) => (
-                  <Card key={i} className={`shadow-sm border-l-4 ${b.status === 'Danger' ? 'border-l-red-500' : b.status === 'Warning' ? 'border-l-amber-500' : 'border-l-emerald-500'}`}>
+                {budgetIntel.budgets.map((b, i) => (
+                  <Card key={i} className={`shadow-sm border-l-4 ${b.status === 'Exceeded' ? 'border-l-red-500' : b.status === 'Warning' ? 'border-l-amber-500' : 'border-l-emerald-500'}`}>
                     <CardContent className="p-4 space-y-3">
                       <div className="flex justify-between items-center">
                         <h4 className="font-bold text-slate-900">{b.category} Budget</h4>
-                        <span className={`text-xs font-bold px-2 py-1 rounded-md ${b.status === 'Danger' ? 'bg-red-50 text-red-700' : b.status === 'Warning' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{b.used}% Used</span>
+                        <span className={`text-xs font-bold px-2 py-1 rounded-md ${b.status === 'Exceeded' ? 'bg-red-50 text-red-700' : b.status === 'Warning' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{Math.round(b.utilization)}% Used</span>
                       </div>
-                      <p className="text-xs text-slate-600 font-medium leading-relaxed bg-slate-50 p-2 rounded">{b.msg}</p>
+                      <p className="text-xs text-slate-600 font-medium leading-relaxed bg-slate-50 p-2 rounded">
+                        {b.status === 'Exceeded' ? `Budget exceeded by ${formatInr(Math.abs(b.remaining))}. Delay unnecessary shopping.` : `You have ${formatInr(b.remaining)} left in this budget.`}
+                      </p>
                     </CardContent>
                   </Card>
                 ))}
+                {budgetIntel.budgets.length === 0 && <p className="text-sm text-slate-500">No active budgets to coach.</p>}
               </div>
 
               <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2 mt-8"><Target className="w-5 h-5 text-emerald-500" /> Goal Coach</h3>
-              <Card className="shadow-sm">
-                <CardContent className="p-5">
-                  <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><Smartphone className="w-5 h-5 text-blue-600"/></div>
-                      <div>
-                        <h4 className="font-bold text-slate-900">Laptop Goal</h4>
-                        <p className="text-xs text-slate-500">Target: {formatInr(85000)}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-black text-slate-900">{formatInr(45000)}</p>
-                      <p className="text-xs font-bold text-emerald-600">52% Reached</p>
-                    </div>
-                  </div>
-                  <div className="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm font-medium flex items-start gap-2 border border-blue-100">
-                    <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
-                    If you increase your monthly contribution by just {formatInr(2000)}, you will complete this goal two months earlier (by September).
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="grid grid-cols-1 gap-4">
+                  {goalForecast.goals.map((g, i) => (
+                      <Card key={i} className="shadow-sm">
+                        <CardContent className="p-5">
+                          <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><Smartphone className="w-5 h-5 text-blue-600"/></div>
+                              <div>
+                                <h4 className="font-bold text-slate-900">{g.name}</h4>
+                                <p className="text-xs text-slate-500">Target: {formatInr(g.target_amount)}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-black text-slate-900">{formatInr(g.saved_amount)}</p>
+                              <p className="text-xs font-bold text-emerald-600">{Math.round(g.progress)}% Reached</p>
+                            </div>
+                          </div>
+                          <div className="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm font-medium flex items-start gap-2 border border-blue-100">
+                            <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+                            {g.progress >= 100 ? "Goal completed! Incredible job!" : `You need to save ${formatInr(g.requiredMonthly)} per month to reach this goal on time.`}
+                          </div>
+                        </CardContent>
+                      </Card>
+                  ))}
+                  {goalForecast.goals.length === 0 && <p className="text-sm text-slate-500">No active goals to coach.</p>}
+              </div>
             </motion.div>
           )}
 
@@ -383,14 +411,14 @@ export function AIAdvisor() {
                     <div className="space-y-6">
                       <div>
                         <label className="text-sm font-bold text-slate-700 flex justify-between mb-2">
-                          <span>Reduce Food Spending</span>
+                          <span>Reduce Expenses</span>
                           <span className="text-indigo-600">{formatInr(simFoodReduction)}</span>
                         </label>
                         <input type="range" min="0" max="10000" step="500" value={simFoodReduction} onChange={(e) => setSimFoodReduction(Number(e.target.value))} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
                       </div>
                       <div>
                         <label className="text-sm font-bold text-slate-700 flex justify-between mb-2">
-                          <span>Increase Monthly Investment</span>
+                          <span>Increase Monthly Goal Contribution</span>
                           <span className="text-indigo-600">{formatInr(simExtraInvestment)}</span>
                         </label>
                         <input type="range" min="0" max="20000" step="1000" value={simExtraInvestment} onChange={(e) => setSimExtraInvestment(Number(e.target.value))} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
@@ -410,21 +438,21 @@ export function AIAdvisor() {
                       <div className="space-y-6">
                         <div className="flex justify-between items-end">
                           <div>
-                            <p className="text-slate-300 text-sm font-medium mb-1">New Net Savings</p>
-                            <p className="text-3xl font-black text-white">{formatInr(simulatedSavings)}</p>
+                            <p className="text-slate-300 text-sm font-medium mb-1">Net Cashflow Change</p>
+                            <p className="text-3xl font-black text-white">{formatInr(simulation.cashFlowChange)}</p>
                           </div>
-                          <span className={`text-sm font-bold px-2 py-1 rounded-md ${simulatedSavings >= baseSavings ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                            {simulatedSavings >= baseSavings ? '+' : ''}{formatInr(simulatedSavings - baseSavings)}
+                          <span className={`text-sm font-bold px-2 py-1 rounded-md ${simulation.cashFlowChange >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                            {simulation.cashFlowChange >= 0 ? '+' : ''}{formatInr(simulation.cashFlowChange)}
                           </span>
                         </div>
                         
                         <div className="flex justify-between items-end border-t border-slate-700 pt-6">
                           <div>
-                            <p className="text-slate-300 text-sm font-medium mb-1">Health Score</p>
-                            <p className="text-2xl font-black text-white">{simulatedScore}<span className="text-slate-500 text-sm">/100</span></p>
+                            <p className="text-slate-300 text-sm font-medium mb-1">New Health Score</p>
+                            <p className="text-2xl font-black text-white">{simulation.simulatedHealthScore}<span className="text-slate-500 text-sm">/100</span></p>
                           </div>
-                          <span className={`text-sm font-bold px-2 py-1 rounded-md ${simulatedScore >= baseScore ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                            {simulatedScore >= baseScore ? '+' : ''}{simulatedScore - baseScore} Pts
+                          <span className={`text-sm font-bold px-2 py-1 rounded-md ${simulation.simulatedHealthScore >= health.score ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                            {simulation.simulatedHealthScore >= health.score ? '+' : ''}{simulation.simulatedHealthScore - health.score} Pts
                           </span>
                         </div>
                       </div>

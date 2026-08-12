@@ -23,7 +23,7 @@ const formatInr = (amount: number) => {
 };
 
 export function AIAdvisor() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   
   // Data from engine
   const store = FinancialEngine.getStore()();
@@ -78,16 +78,23 @@ export function AIAdvisor() {
     'Investment Advice', 'Financial Health', 'Can I afford a ₹65,000 laptop?'
   ];
 
-  const handleSendMessage = async (e?: React.FormEvent, retryMessage?: string) => {
+  const handleSendMessage = async (e?: React.FormEvent, directMessage?: string, isRetry = false) => {
     if (e) e.preventDefault();
     
-    const messageToSend = retryMessage || chatInput.trim();
+    const messageToSend = directMessage || chatInput.trim();
     if (!messageToSend) return;
 
-    if (!retryMessage) {
+    // Capture history before state is updated
+    const historyBeforeMessage = isRetry ? messages.slice(0, -1) : messages;
+
+    if (!isRetry) {
       const newMsg = { id: Date.now(), sender: 'user', text: messageToSend, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
       setMessages(prev => [...prev, newMsg]);
-      setChatInput('');
+      
+      // Clear typed input only if it wasn't a direct prompt click
+      if (!directMessage) {
+        setChatInput('');
+      }
     }
 
     setIsTyping(true);
@@ -96,11 +103,13 @@ export function AIAdvisor() {
     try {
       const res = await fetch('http://localhost:5000/api/ai/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`
+        },
         body: JSON.stringify({
-          userId: user?.id,
           message: messageToSend,
-          history: messages
+          history: historyBeforeMessage
         })
       });
 
@@ -115,7 +124,6 @@ export function AIAdvisor() {
     } catch (err) {
       console.error(err);
       setHasError(true);
-      // We keep the chat input so they can try again if we want, or we show a retry button
     } finally {
       setIsTyping(false);
     }
@@ -156,15 +164,26 @@ export function AIAdvisor() {
       {/* Left Column: AI Chat Interface */}
       <div className="w-full lg:w-1/3 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-full">
         {/* Chat Header */}
-        <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-white flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-md relative">
-            <Bot className="w-5 h-5" />
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-white rounded-full"></div>
+        <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-white flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-md relative">
+              <Bot className="w-5 h-5" />
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-white rounded-full"></div>
+            </div>
+            <div>
+              <h2 className="font-bold text-slate-900">FinPilot AI</h2>
+              <p className="text-xs font-medium text-slate-500">Your Personal Financial Advisor</p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-bold text-slate-900">FinPilot AI</h2>
-            <p className="text-xs font-medium text-slate-500">Your Personal Financial Advisor</p>
-          </div>
+          <button 
+            type="button"
+            onClick={() => setMessages([
+              { id: Date.now(), sender: 'ai', text: `Chat cleared. How can I help you with your finances today?`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+            ])}
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50/50 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg transition-colors border border-indigo-100/50 shadow-sm"
+          >
+            Clear Chat
+          </button>
         </div>
 
         {/* Chat Messages */}
@@ -196,7 +215,7 @@ export function AIAdvisor() {
             <div className="flex flex-col items-start">
               <div className="max-w-[85%] p-3.5 rounded-2xl bg-red-50 border border-red-100 text-red-700 rounded-tl-sm shadow-sm">
                 <p className="text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4" /> Connection failed.</p>
-                <button onClick={() => handleSendMessage(undefined, messages[messages.length-1]?.text)} className="mt-2 text-xs font-bold text-red-600 hover:text-red-800 underline decoration-red-300 underline-offset-2 transition-colors">Try again</button>
+                <button onClick={() => handleSendMessage(undefined, messages[messages.length-1]?.text, true)} className="mt-2 text-xs font-bold text-red-600 hover:text-red-800 underline decoration-red-300 underline-offset-2 transition-colors">Try again</button>
               </div>
             </div>
           )}
@@ -207,7 +226,7 @@ export function AIAdvisor() {
           <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-100/50">
             {quickQuestions.map(q => (
               <button 
-                key={q} onClick={() => setChatInput(q)} disabled={isTyping}
+                key={q} onClick={() => handleSendMessage(undefined, q)} disabled={isTyping}
                 className="px-3 py-1.5 bg-white border border-indigo-100 text-indigo-600 text-xs font-bold rounded-full hover:bg-indigo-50 transition-colors shadow-sm disabled:opacity-50"
               >
                 {q}
@@ -313,7 +332,7 @@ export function AIAdvisor() {
                 </CardHeader>
                 <CardContent className="pt-4 space-y-3">
                   {advice.map((rec, idx) => (
-                    <div key={idx} onClick={() => setChatInput(rec)} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100 cursor-pointer">
+                    <div key={idx} onClick={() => handleSendMessage(undefined, rec)} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100 cursor-pointer">
                       <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 bg-amber-500`}></div>
                       <div>
                         <h4 className="font-bold text-slate-900 text-sm mb-1">AI Coach</h4>
@@ -322,7 +341,7 @@ export function AIAdvisor() {
                     </div>
                   ))}
                   {health.improvementSuggestions.map((rec, idx) => (
-                    <div key={`health-${idx}`} onClick={() => setChatInput(rec)} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100 cursor-pointer">
+                    <div key={`health-${idx}`} onClick={() => handleSendMessage(undefined, rec)} className="flex gap-4 p-4 bg-slate-50 rounded-xl hover:bg-indigo-50/50 transition-colors border border-slate-100 cursor-pointer">
                       <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 bg-blue-500`}></div>
                       <div>
                         <h4 className="font-bold text-slate-900 text-sm mb-1">Health Goal</h4>

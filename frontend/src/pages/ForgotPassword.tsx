@@ -44,7 +44,7 @@ export function ForgotPassword() {
             We've sent a password reset link to <strong>{email}</strong>.
           </p>
           <Link to="/login">
-            <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  className="w-full">Return to Login</Button>
+            <Button className="w-full">Return to Login</Button>
           </Link>
         </div>
       </div>

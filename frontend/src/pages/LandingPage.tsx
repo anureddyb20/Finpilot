@@ -34,7 +34,7 @@ export function LandingPage() {
           <div className="flex items-center gap-4">
             <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-slate-900">Sign In</Link>
             <Link to="/signup">
-              <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  size="sm">Get Started</Button>
+              <Button size="sm">Get Started</Button>
             </Link>
           </div>
         </div>
@@ -61,7 +61,7 @@ export function LandingPage() {
           </motion.p>
           <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link to="/signup">
-              <Button onClick={() => toast.success('Feature coming soon!', { icon: '🚧' })}  size="lg" className="w-full sm:w-auto gap-2">
+              <Button size="lg" className="w-full sm:w-auto gap-2">
                 Start for Free <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>

@@ -468,6 +468,30 @@ export function Budgets() {
                 </div>
                 <div className="space-y-2 mt-2">
                   {categoryDistribution.slice(0, 5).map((c, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: c.color}}></div>
+                        <span className="text-slate-600">{c.name}</span>
+                      </div>
+                      <span className="font-semibold text-slate-900">{formatInr(c.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+        </div>
+      </div>
+
+      {/* Add / Edit Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={closeModal}
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 

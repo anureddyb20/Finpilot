@@ -124,7 +124,22 @@ const chat = async (req, res, next) => {
       return res.status(401).json({ error: { message: 'User not authenticated' } });
     }
 
-    // 3. Fetch user's financial data from Supabase
+    // Extract Bearer token to initialize user-scoped Supabase client
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: { message: 'Authentication token missing' } });
+    }
+
+    const userSupabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    });
+
+    // 3. Fetch user's financial data from Supabase (using user-scoped client to satisfy RLS)
     const [
       transactionsRes,
       budgetsRes,
@@ -132,11 +147,11 @@ const chat = async (req, res, next) => {
       recurringRes,
       notificationsRes
     ] = await Promise.all([
-      supabase.from('transactions').select('*').eq('user_id', userId).is('deleted_at', null).order('date', { ascending: false }),
-      supabase.from('budgets').select('*').eq('user_id', userId),
-      supabase.from('goals').select('*').eq('user_id', userId),
-      supabase.from('recurring_payments').select('*').eq('user_id', userId),
-      supabase.from('notifications').select('*').eq('user_id', userId).eq('is_read', false).order('created_at', { ascending: false }).limit(5)
+      userSupabase.from('transactions').select('*').eq('user_id', userId).is('deleted_at', null).order('date', { ascending: false }),
+      userSupabase.from('budgets').select('*').eq('user_id', userId),
+      userSupabase.from('goals').select('*').eq('user_id', userId),
+      userSupabase.from('recurring_payments').select('*').eq('user_id', userId),
+      userSupabase.from('notifications').select('*').eq('user_id', userId).eq('is_read', false).order('created_at', { ascending: false }).limit(5)
     ]);
 
     // Handle any Supabase query errors

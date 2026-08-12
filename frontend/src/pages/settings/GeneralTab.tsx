@@ -8,7 +8,6 @@ import { supabase } from '../../lib/supabase';
 export function GeneralTab() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,8 +34,6 @@ export function GeneralTab() {
         setProfile(data);
       } catch (error) {
         console.error("Error loading profile:", error);
-      } finally {
-        setLoading(false);
       }
     }
     loadProfile();

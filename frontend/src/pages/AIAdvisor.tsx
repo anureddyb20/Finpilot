@@ -47,6 +47,8 @@ export function AIAdvisor() {
   const [messages, setMessages] = useState([
     { id: 1, sender: 'ai', text: `Good Evening! I am your AI Financial Advisor. Your current health score is ${health.score}/100. ${digest.topAdvice} What would you like to focus on today?`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
   ]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,55 +78,47 @@ export function AIAdvisor() {
     'Investment Advice', 'Financial Health', 'Can I afford a ₹65,000 laptop?'
   ];
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
+  const handleSendMessage = async (e?: React.FormEvent, retryMessage?: string) => {
+    if (e) e.preventDefault();
+    
+    const messageToSend = retryMessage || chatInput.trim();
+    if (!messageToSend) return;
 
-    const query = chatInput.trim().toLowerCase();
-    const newMsg = { id: Date.now(), sender: 'user', text: chatInput, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    setMessages(prev => [...prev, newMsg]);
-    setChatInput('');
+    if (!retryMessage) {
+      const newMsg = { id: Date.now(), sender: 'user', text: messageToSend, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      setMessages(prev => [...prev, newMsg]);
+      setChatInput('');
+    }
 
-    // Generate AI response based on real data
-    setTimeout(() => {
-      let responseText = "";
-      
-      if (query.includes('spend')) {
-        responseText = `You have spent ${formatInr(spending.monthly)} this month. Your highest spending category is ${spending.topCategory?.name || 'Unknown'} (${formatInr(spending.topCategory?.amount || 0)}).`;
-      } else if (query.includes('budget')) {
-        if (budgetIntel.exceededCount > 0) {
-          responseText = `You have exceeded ${budgetIntel.exceededCount} budgets this month. Your most concerning category is ${budgetIntel.exceededBudgets[0]?.category}.`;
-        } else {
-          responseText = `Great job! You are staying within all your budgets.`;
-        }
-      } else if (query.includes('sav')) {
-        responseText = `Your current savings rate is ${Math.round(savings.savingsRate)}%. ${savings.suggestions[0]}`;
-      } else if (query.includes('health')) {
-        responseText = `Your financial health score is ${health.score}/100. ${health.reasons[0] || 'Keep up the good work.'}`;
-      } else if (query.includes('afford') || query.match(/\d+/)) {
-        const amountMatch = query.match(/\d+/g);
-        if (amountMatch) {
-            const amount = Number(amountMatch.join(''));
-            if (amount > savings.totalSavings) {
-                responseText = `A purchase of ${formatInr(amount)} exceeds your current monthly savings of ${formatInr(savings.totalSavings)}. You would need to dip into past savings or wait.`;
-            } else {
-                responseText = `Yes, you can afford ${formatInr(amount)} as it fits within your monthly surplus of ${formatInr(savings.totalSavings)}.`;
-            }
-        } else {
-            responseText = `Please tell me the exact amount of the item you want to purchase in the Purchase Advisor tab!`;
-        }
-      } else if (query.includes('invest')) {
-        responseText = `Based on your profile, you should ensure your Emergency Fund is fully funded first. You have ${formatInr(savings.totalSavings)} available for investments this month.`;
-      } else {
-        responseText = advice[Math.floor(Math.random() * advice.length)] || "I'm analyzing your data. Check the tabs on the right for deep insights!";
-      }
+    setIsTyping(true);
+    setHasError(false);
+
+    try {
+      const res = await fetch('http://localhost:5000/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          message: messageToSend,
+          history: messages
+        })
+      });
+
+      if (!res.ok) throw new Error('Failed to fetch AI response');
+      const data = await res.json();
 
       setMessages(prev => [...prev, {
         id: Date.now(), sender: 'ai', 
-        text: responseText, 
+        text: data.response || "Sorry, I couldn't process that.", 
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }]);
-    }, 600);
+    } catch (err) {
+      console.error(err);
+      setHasError(true);
+      // We keep the chat input so they can try again if we want, or we show a retry button
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const simulatePurchase = (e: React.FormEvent) => {
@@ -187,14 +181,34 @@ export function AIAdvisor() {
               <span className="text-[10px] text-slate-400 font-medium mt-1 mx-1">{msg.time}</span>
             </div>
           ))}
+          
+          {isTyping && (
+            <div className="flex flex-col items-start">
+              <div className="max-w-[85%] p-3.5 rounded-2xl bg-white border border-slate-100 text-slate-700 rounded-tl-sm shadow-sm flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          )}
+
+          {hasError && (
+            <div className="flex flex-col items-start">
+              <div className="max-w-[85%] p-3.5 rounded-2xl bg-red-50 border border-red-100 text-red-700 rounded-tl-sm shadow-sm">
+                <p className="text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4" /> Connection failed.</p>
+                <button onClick={() => handleSendMessage(undefined, messages[messages.length-1]?.text)} className="mt-2 text-xs font-bold text-red-600 hover:text-red-800 underline decoration-red-300 underline-offset-2 transition-colors">Try again</button>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
           
           {/* Quick Questions Chips */}
           <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-100/50">
             {quickQuestions.map(q => (
               <button 
-                key={q} onClick={() => setChatInput(q)}
-                className="px-3 py-1.5 bg-white border border-indigo-100 text-indigo-600 text-xs font-bold rounded-full hover:bg-indigo-50 transition-colors shadow-sm"
+                key={q} onClick={() => setChatInput(q)} disabled={isTyping}
+                className="px-3 py-1.5 bg-white border border-indigo-100 text-indigo-600 text-xs font-bold rounded-full hover:bg-indigo-50 transition-colors shadow-sm disabled:opacity-50"
               >
                 {q}
               </button>
@@ -215,8 +229,8 @@ export function AIAdvisor() {
               placeholder="Ask anything about your finances..." 
               className="w-full pl-12 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
             />
-            <button type="submit" disabled={!chatInput.trim()} className="absolute right-2 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm">
-              <Send className="w-4 h-4" />
+            <button type="submit" disabled={!chatInput.trim() || isTyping} className="absolute right-2 p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm">
+              {isTyping ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send className="w-4 h-4" />}
             </button>
           </form>
         </div>

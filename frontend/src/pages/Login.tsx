@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Zap, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Zap, Mail, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 
@@ -28,11 +28,6 @@ export function Login() {
       });
 
       if (signInError) throw signInError;
-
-      // Remember me logic: 
-      // Supabase automatically persists session in localStorage by default.
-      // If remember me is false, we might want to change the persistence strategy to session, 
-      // but by default keeping it simple to just use the default persistence.
       
       const from = location.state?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
@@ -44,7 +39,11 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
+      <Link to="/" className="absolute top-4 left-4 sm:top-8 sm:left-8 p-2.5 text-slate-500 hover:text-slate-900 bg-white border border-slate-200 rounded-full shadow-sm hover:shadow transition-all group">
+        <ArrowLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+      </Link>
+      
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-blue-500/20">

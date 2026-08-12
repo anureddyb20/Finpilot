@@ -7,14 +7,13 @@ import toast from 'react-hot-toast';
 export function PreferencesTab() {
   const { user } = useAuth();
   const { settings, updateSetting } = useSettings();
-  const { settings, updateSetting, saveSettings } = useSettings();
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     if (!user || !settings) return;
     setSaving(true);
     try {
-      await saveSettings();
+      // updateSetting automatically saves changes
       toast.success("Preferences updated successfully");
     } catch (error) {
       console.error("Error saving settings:", error);

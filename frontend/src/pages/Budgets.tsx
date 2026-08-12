@@ -475,30 +475,6 @@ export function Budgets() {
                       </div>
                       <span className="font-semibold text-slate-900">{formatInr(c.value)}</span>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Quick Actions List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <button onClick={() => openModal()} className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700">
-                <span className="flex items-center gap-2"><Plus className="w-4 h-4 text-primary" /> Create Budget</span>
-                <ArrowUpRight className="w-4 h-4 text-slate-400" />
-              </button>
-            </CardContent>
-          </Card>
-
-        </div>
-      </div>
-
-      {/* Add / Edit Modal */}
-      <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <motion.div 

@@ -584,30 +584,7 @@ export function RecurringPayments() {
         {/* Right Column: AI Insights & Analytics */}
         <div className="space-y-6">
           
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-bold text-slate-500 uppercase">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3">
-              <button onClick={() => openModal(null, 'Subscriptions')} className="flex flex-col items-center justify-center gap-2 p-3 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors border border-slate-100">
-                <Tv className="w-5 h-5 text-indigo-500" />
-                <span className="text-xs font-bold text-slate-700">Add Sub</span>
-              </button>
-              <button onClick={() => openModal(null, 'Loan EMI')} className="flex flex-col items-center justify-center gap-2 p-3 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors border border-slate-100">
-                <Home className="w-5 h-5 text-blue-500" />
-                <span className="text-xs font-bold text-slate-700">Add EMI</span>
-              </button>
-              <button onClick={() => openModal(null, 'Mutual Fund SIP')} className="flex flex-col items-center justify-center gap-2 p-3 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors border border-slate-100">
-                <Activity className="w-5 h-5 text-emerald-500" />
-                <span className="text-xs font-bold text-slate-700">Add SIP</span>
-              </button>
-              <button onClick={() => setActiveTab('Calendar')} className="flex flex-col items-center justify-center gap-2 p-3 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors border border-slate-100">
-                <Calendar className="w-5 h-5 text-amber-500" />
-                <span className="text-xs font-bold text-slate-700">Calendar</span>
-              </button>
-            </CardContent>
-          </Card>
+
 
           {/* AI Insights Widget */}
           <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 shadow-sm relative overflow-hidden text-slate-800 border border-indigo-100">
